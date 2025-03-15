@@ -1,4 +1,4 @@
-import { ExceptionTypes } from '@/constants/error';
+import { ExceptionTypes } from '@/constants/errors';
 
 type ExceptionType = keyof typeof ExceptionTypes;
 
