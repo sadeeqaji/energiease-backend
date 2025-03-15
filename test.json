@@ -1,0 +1,55 @@
+{
+  "screens": [
+    {
+      "data": {},
+      "id": "WELCOME_SCREEN",
+      "layout": {
+        "children": [
+          {
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "⚡ Welcome to EnergiEase! How would you like to proceed?"
+              },
+              {
+                "data-source": [
+                  {
+                    "id": "buy_again",
+                    "title": "Buy Again",
+                    "description": ""
+                  },
+                  {
+                    "id": "enter_new_meter",
+                    "title": "Enter New Meter",
+                    "description": ""
+                  }
+                ],
+                "label": "Select an option below",
+                "name": "_Welcome_to_EnergiEase_50dc14",
+                "required": true,
+                "type": "RadioButtonsGroup"
+              },
+
+              {
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "screen_0__Welcome_to_EnergiEase_0": "${form._Welcome_to_EnergiEase_50dc14}"
+                  }
+                },
+                "type": "Footer"
+              }
+            ],
+            "name": "flow_path",
+            "type": "Form"
+          }
+        ],
+        "type": "SingleColumnLayout"
+      },
+      "terminal": true,
+      "title": "Feedback 1 of 2"
+    }
+  ],
+  "version": "7.0"
+}
