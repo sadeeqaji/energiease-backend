@@ -6,4 +6,4 @@ export interface BankDetails {
 }
 
 
-export type PaymentProviders = 'monnify' | 'paystack';
+export type PaymentProviders = 'Monnify' | 'Paystack';

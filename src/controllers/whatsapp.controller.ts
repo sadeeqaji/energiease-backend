@@ -10,9 +10,8 @@ import {
 import crypto from 'crypto';
 import { env } from '@/config';
 import userService from '@/services/user.service';
-import { KYC_FLOW_MESSAGE, MENU_MESSAGE, TRANSACTION_IS_BEING_VERIFIED, SAVED_METER_NO } from '@/constants/whatsapp.flow';
-import { handleEnterMeter, handleMenuFlow } from '@/flow-handler';
-import { } from '@/flow-handler/menu.flow';
+import { GET_STARTED, TRANSACTION_IS_BEING_VERIFIED } from '@/constants/whatsapp.flow';
+import { handleEnterMeter } from '@/flow-handler';
 
 const whatsappService = new WhatsAppService();
 
@@ -26,8 +25,8 @@ export class WhatsAppController {
         req.log.warn('Invalid webhook payload');
         return reply.status(400).send({ error: 'Invalid payload' });
       }
-
       const messageData = entry[0]?.changes[0]?.value?.messages?.[0];
+      console.log(messageData, 'messageData')
       const responseJson = messageData?.interactive?.nfm_reply?.response_json;
       const flowResponse = responseJson ? JSON.parse(responseJson) : null;
       if (flowResponse && messageData?.from) {
@@ -40,19 +39,13 @@ export class WhatsAppController {
         return reply.status(200).send({ status: 'No message data' });
       }
       const { from, text } = messageData;
+      console.log(messageData)
       const messageText = text?.body || 'No text';
 
       req.log.info(`📩 Received message: "${messageText}" from ${from}`);
-      const user = await userService.getUserByIdentifier(from);
-      if (user?._id) {
-        const data = MENU_MESSAGE('+2347019438856');
-        await whatsappService.sendMessage(data);
-        return reply.status(200).send({ status: 'Message processed' });
-      } else {
-        const data = KYC_FLOW_MESSAGE(from);
-        await whatsappService.sendMessage(SAVED_METER_NO);
-        return reply.status(200).send({ status: 'KYC flow initiated' });
-      }
+      const data = GET_STARTED(from)
+      await whatsappService.sendMessage(data);
+      return reply.status(200).send({ status: 'Message processed' });
     } catch (error) {
       req.log.error('Error processing WhatsApp webhook:', error);
       return reply.status(500).send({ error: 'Internal Server Error' });
@@ -159,13 +152,10 @@ export class WhatsAppController {
 
 
     switch (flow_token) {
-      case 'm':
-        // if (flow_token === 'kyc') {
-        return handleEnterMeter(decryptedBody);
-        // }
-        break;
       case 'menu':
-        return handleMenuFlow(decryptedBody);
+        return handleEnterMeter(decryptedBody);
+
+        break;
     }
   };
 }

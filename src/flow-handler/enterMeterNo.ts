@@ -1,7 +1,5 @@
-import { env } from '@/config';
 import buyPowerService from '@/services/buypower.service';
 import meterService from '@/services/meter.service';
-import monnifyService from '@/services/monnify.service';
 import orderService from '@/services/order.service';
 import paymentService from '@/services/payment.service';
 import { BillType } from '@/types/bill.types';
@@ -110,17 +108,19 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
           user: '67cb254cf55a6cd19cc61d33'
         })
         if (order.reference && order._id) {
-          const { paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order)
+          const { provider, paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order)
           return {
             screen: 'PAYMENT',
             data: {
-              "account_name": `Account Number: ${bankTransferDetails.accountName}`,
-              "account_no": `Account Number: ${bankTransferDetails.accountNumber}`,
-              "amount": `Account Number: ${order.amount}`,
-              "bank_name": `Bank Name: ${bankTransferDetails.bankName}`,
-              "valid_until": getMinutesRemaining(bankTransferDetails.expiresOn),
-              "payment_link": `${paymentUrl}`,
-              "order_reference": order.reference
+              account_name: `Account Number: ${bankTransferDetails.accountName}`,
+              account_no: `Account Number: ${bankTransferDetails.accountNumber}`,
+              amount: `Account Number: ${order.amount}`,
+              bank_name: `Bank Name: ${bankTransferDetails.bankName}`,
+              valid_until: getMinutesRemaining(bankTransferDetails.expiresOn),
+              payment_provider: `Pay with ${provider}`,
+              // payment_link: `${paymentUrl}`,
+              payment_link: 'https://www.google.com/',
+              order_reference: order.reference
             },
           };
         }

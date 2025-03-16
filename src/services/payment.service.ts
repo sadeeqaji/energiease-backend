@@ -6,14 +6,15 @@ import { MonnifyInitTransactionPayload } from '@/types/monnify.types';
 import { PaystackInitTransactionPayload } from '@/types/paystack.types';
 import { transformBankDetails } from '@/utils/payment';
 import { BankDetails, PaymentProviders } from '@/types/payment.types';
+import { makeValidURI } from '@/utils/url';
 
 export class PaymentService {
     private paymentProviders: { name: PaymentProviders; service: MonnifyService | PaystackService; priority: number }[];
 
     constructor() {
         this.paymentProviders = [
-            { name: 'monnify' as PaymentProviders, service: new MonnifyService(), priority: 1 },
-            { name: 'paystack' as PaymentProviders, service: new PaystackService(), priority: 2 },
+            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 1 },
+            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 2 },
         ].sort((a, b) => a.priority - b.priority);
     }
 
@@ -31,7 +32,7 @@ export class PaymentService {
                 let paymentResponse;
                 let bankTransferDetails;
 
-                if (provider.name === 'monnify') {
+                if (provider.name === 'Monnify') {
                     const payload: MonnifyInitTransactionPayload = {
                         amount: order.amount,
                         customerName: 'Customer',
@@ -43,11 +44,11 @@ export class PaymentService {
                         const generateBankResponse = await monnifyService.generateBankTransfer(
                             { transactionReference: paymentResponse.transactionReference }
                         )
-                        bankTransferDetails = transformBankDetails('monnify', generateBankResponse)
+                        bankTransferDetails = transformBankDetails('Monnify', generateBankResponse)
 
                     }
 
-                } else if (provider.name === 'paystack') {
+                } else if (provider.name === 'Paystack') {
                     const payload: PaystackInitTransactionPayload = {
                         amount: order.amount.toString(),
                         email: 'accounting@mindcolony.tech',
@@ -61,13 +62,13 @@ export class PaymentService {
                         }
                     )
                     console.log(generateBankResponse, 'generateBankResponse')
-                    bankTransferDetails = transformBankDetails('paystack', generateBankResponse)
+                    bankTransferDetails = transformBankDetails('Paystack', generateBankResponse)
 
                 }
 
                 if (paymentResponse && bankTransferDetails) {
                     return {
-                        paymentUrl: paymentResponse.authorization_url || paymentResponse.checkoutUrl,
+                        paymentUrl: paymentResponse.authorization_url || makeValidURI(paymentResponse.checkoutUrl),
                         provider: provider.name,
                         bankTransferDetails
                     };

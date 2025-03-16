@@ -1,14 +1,14 @@
 import { BankDetails, PaymentProviders } from "@/types/payment.types";
 
 export function transformBankDetails(provider: PaymentProviders, data: any): BankDetails {
-    if (provider === 'paystack') {
+    if (provider === 'Paystack') {
         return {
             bankName: data.bank.name,
             accountNumber: data.account_number,
             expiresOn: data.account_expires_at,
             accountName: data.account_name,
         };
-    } else if (provider === 'monnify') {
+    } else if (provider === 'Monnify') {
         return {
             bankName: data.bankName,
             accountNumber: data.accountNumber,

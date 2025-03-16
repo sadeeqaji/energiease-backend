@@ -72,7 +72,7 @@ export const MENU_MESSAGE = (to: string) => ({
 });
 
 
-export const REVIEW_ORDER = (to: string) => ({
+export const GET_STARTED = (to: string) => ({
   messaging_product: 'whatsapp',
   to,
   type: 'interactive',
@@ -80,24 +80,24 @@ export const REVIEW_ORDER = (to: string) => ({
     type: 'flow',
     header: {
       type: 'text',
-      text: 'Welcome to Energiease! 🌟',
+      text: '💡 Welcome to Energiease! ⚡',
     },
     body: {
-      text: 'Get access to Shariah - compliant financing with ease. No interest, no hidden fees, just ethical financial solutions for you. Tap the button below to get started!',
+      text: 'Hi there! 👋 You’re just a few taps away from seamless electricity purchase.',
     },
     footer: {
-      text: 'Click the button below to proceed',
+      text: 'Tap below to get started. Quick & easy! ⚡',
     },
     action: {
       name: 'flow',
       parameters: {
-        flow_id: '2954602864703606',
+        flow_id: '1358463635306732',
         flow_message_version: '3',
-        flow_token: 'kyc',
-        flow_cta: 'Get Started',
+        flow_token: 'menu',
+        flow_cta: 'Purchase Electricity',
         flow_action: 'navigate',
         flow_action_payload: {
-          screen: 'ENTER_BVN',
+          screen: 'WELCOME_SCREEN',
           data: {
             phone_number: to,
           },
