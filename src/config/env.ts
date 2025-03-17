@@ -2,6 +2,7 @@ import { cleanEnv, str, num } from 'envalid';
 
 const env = cleanEnv(process.env, {
   MONGODB_URI: str(),
+  HOST: str(),
   PORT: num({ default: 3000 }),
   NODE_ENV: str({ choices: ['development', 'production', 'test'] }),
   META_ACCESS_TOKEN: str(),

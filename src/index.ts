@@ -44,7 +44,7 @@ fastify.register(dbConnectorPlugin);
 
 const start = async () => {
   try {
-    await fastify.listen({ port: env.PORT });
+    await fastify.listen({ host: env.HOST, port: env.PORT });
     console.log(`Server running at http://localhost:${env.PORT}`);
   } catch (err) {
     fastify.log.error(err);
