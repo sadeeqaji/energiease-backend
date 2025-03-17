@@ -9,7 +9,7 @@ import {
 } from '@/utils/whatsappEncryption';
 import crypto from 'crypto';
 import { env } from '@/config';
-import userService from '@/services/user.service';
+// import userService from '@/services/user.service';
 import { GET_STARTED, TRANSACTION_IS_BEING_VERIFIED } from '@/constants/whatsapp.flow';
 import { handleEnterMeter } from '@/flow-handler';
 

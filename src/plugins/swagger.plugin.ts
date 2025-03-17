@@ -7,7 +7,7 @@ async function swaggerPlugin(fastify: FastifyInstance) {
       openapi: '3.0.0',
       info: {
         title: 'Sales count',
-        description: 'Salescount backend documentation',
+        description: 'Energiease backend documentation',
         version: '1.0.0',
       },
       components: {
