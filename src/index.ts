@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import 'dotenv/config';
-import { dbConnectorPlugin, routesPlugin, swaggerPlugin } from '@/plugins';
+import { dbConnectorPlugin, routesPlugin, swaggerPlugin } from './plugins';
 import cors from "@fastify/cors";
 import fastifyRawBody from 'fastify-raw-body';
 import { errorHandler } from './plugins/error.plugin';
