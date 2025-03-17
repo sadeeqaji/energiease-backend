@@ -24,6 +24,7 @@
     "@fastify/sensible": "^6.0.3",
     "@fastify/swagger": "^9.4.2",
     "@fastify/swagger-ui": "^5.2.2",
+    "applicationinsights": "^3.6.0",
     "axios": "^1.8.2",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.13.9",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",

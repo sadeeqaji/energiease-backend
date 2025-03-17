@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import axios from 'axios';
 import { WhatsAppMedia } from '@/types/whatsapp.types';
+import { WithImplicitCoercion } from 'buffer';
 
 const base64ToBuffer = (
   base64:

@@ -80,7 +80,6 @@ export class OrderService {
                     if (provider.validate) {
                         await provider.validate(order.details);
                     }
-                    console.log(order.customerPhone, "yooo")
                     const result = await provider.vend({
                         amount,
                         billType: order.type,
@@ -92,7 +91,7 @@ export class OrderService {
                     });
                     if (result.success) {
                         const existingMeter = await meterService.getMeter(
-                            order?.customerPhone
+                            { phoneNumber: order?.customerPhone }
                         );
 
                         if (!existingMeter && order.type === BillType.ELECTRICITY) {

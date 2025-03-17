@@ -17,6 +17,7 @@ const env = cleanEnv(process.env, {
   MONNIFY_CONTRACT_CODE: str(),
   MONNIFY_TIMEOUT: str(),
   PAYSTACK_SECRET_KEY: str(),
+  APPINSIGHTS_INSTRUMENTATION_KEY: str(),
 });
 
 export default env;
