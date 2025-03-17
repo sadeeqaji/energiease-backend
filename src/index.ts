@@ -7,6 +7,7 @@ import { errorHandler } from './plugins/error.plugin';
 import authenticationPlugin from './plugins/authentication.plugin';
 import successResponsePlugin from './plugins/successResponse.plugin';
 import { corsOptions } from './constants/cor';
+import { env } from './config';
 
 const fastify = Fastify({
   logger: {
@@ -43,8 +44,8 @@ fastify.register(dbConnectorPlugin);
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000 });
-    console.log('Server running at http://localhost:3000');
+    await fastify.listen({ port: env.PORT });
+    console.log(`Server running at http://localhost:${env.PORT}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
