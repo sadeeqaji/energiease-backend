@@ -39,7 +39,7 @@ export const decryptRequest = (
       Buffer.from(encrypted_aes_key, 'base64'),
     );
   } catch (error) {
-    console.error(error);
+    console.log(error, 'error');
     /*
         Failed to decrypt. Please verify your private key.
         If you change your public key. You need to return HTTP status code 421 to refresh the public key on the client

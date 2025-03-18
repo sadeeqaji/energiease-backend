@@ -79,9 +79,9 @@ export class WhatsAppController {
       } catch (err) {
         req.log.error('Error decrypting request:', err);
         if (err instanceof FlowEndpointException) {
-          return reply.status(err.statusCode).send();
+          return reply.status(err.statusCode).send(err.message);
         }
-        return reply.status(500).send();
+        return reply.status(500).send(err);
       }
 
       const { aesKeyBuffer, initialVectorBuffer, decryptedBody } =
