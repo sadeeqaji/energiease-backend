@@ -26,7 +26,6 @@ export class WhatsAppController {
         return reply.status(400).send({ error: 'Invalid payload' });
       }
       const messageData = entry[0]?.changes[0]?.value?.messages?.[0];
-      console.log(messageData, 'messageData')
       const responseJson = messageData?.interactive?.nfm_reply?.response_json;
       const flowResponse = responseJson ? JSON.parse(responseJson) : null;
       if (flowResponse && messageData?.from) {
@@ -39,7 +38,6 @@ export class WhatsAppController {
         return reply.status(200).send({ status: 'No message data' });
       }
       const { from, text } = messageData;
-      console.log(messageData)
       const messageText = text?.body || 'No text';
 
       req.log.info(`📩 Received message: "${messageText}" from ${from}`);
@@ -57,7 +55,6 @@ export class WhatsAppController {
     const mode = query['hub.mode'];
     const token = query['hub.verify_token'];
     const challenge = query['hub.challenge'];
-    console.log(req.query)
     if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
       req.log.info('Webhook verified successfully');
       return reply.status(200).send(challenge);
@@ -103,6 +100,7 @@ export class WhatsAppController {
       );
       return reply.send(encryptedResponse);
     } catch (error) {
+      console.log(error, "Whatsapp flow")
       req.log.error('Error processing WhatsApp Flow webhook:', error);
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
@@ -140,7 +138,6 @@ export class WhatsAppController {
   private getNextScreen = async (decryptedBody: DecryptedResponse) => {
     const { action, flow_token } = decryptedBody;
     console.log(decryptedBody, '====decryptedBody===')
-    // console.log('Decrypted Body:', decryptedBody);
     if (action === 'ping') {
       return {
         data: {
@@ -149,12 +146,9 @@ export class WhatsAppController {
       };
     }
 
-
-
     switch (flow_token) {
       case 'menu':
         return handleEnterMeter(decryptedBody);
-
         break;
     }
   };
