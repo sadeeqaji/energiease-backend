@@ -2,7 +2,7 @@ import { env } from "@/config";
 import { DefaultAzureCredential, ClientSecretCredential } from "@azure/identity";
 import { SecretClient } from "@azure/keyvault-secrets";
 
-const keyVaultUrl = process.env.KEY_VAULT_URL!
+const keyVaultUrl = env.KEY_VAULT_URL!
 const secretName = "WhatsAppPrivateKey";
 
 const credential = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging'
@@ -14,7 +14,7 @@ const credential = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging'
     );
 
 console.log(env.NODE_ENV, 'env.NODE_ENV')
-
+console.log(credential, 'credential')
 const client = new SecretClient(keyVaultUrl, credential);
 
 export async function getSecret(): Promise<string | undefined> {
