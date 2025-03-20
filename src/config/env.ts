@@ -10,7 +10,6 @@ const env = cleanEnv(process.env, {
   VERIFY_TOKEN: str(),
   PASSPHRASE: str(),
   META_APP_SECRET: str(),
-  // PRIVATE_KEY: str(),
   BUYPOWER_API_KEY: str(),
   BUYPOWER_BASE_URL: str(),
   MONNIFY_API_KEY: str(),
@@ -23,6 +22,7 @@ const env = cleanEnv(process.env, {
   AZURE_TENANT_ID: str({ default: undefined }),
   AZURE_CLIENT_ID: str({ default: undefined }),
   AZURE_CLIENT_SECRET: str({ default: undefined }),
+  FLOW_ID: str()
 });
 
 export default env;

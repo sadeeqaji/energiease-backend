@@ -1,3 +1,4 @@
+import { env } from "@/config";
 import { ElectricityPurchaseConfirmationParams } from "@/types/whatsapp.types";
 
 export const KYC_FLOW_MESSAGE = (to: string) => ({
@@ -91,7 +92,7 @@ export const GET_STARTED = (to: string) => ({
     action: {
       name: 'flow',
       parameters: {
-        flow_id: '1358463635306732',
+        flow_id: env.FLOW_ID,
         flow_message_version: '3',
         flow_token: 'menu',
         flow_cta: 'Purchase Electricity',
