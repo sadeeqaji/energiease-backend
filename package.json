@@ -20,6 +20,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@azure/keyvault-secrets": "^4.9.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/sensible": "^6.0.3",
     "@fastify/swagger": "^9.4.2",

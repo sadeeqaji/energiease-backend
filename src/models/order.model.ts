@@ -8,6 +8,7 @@ import {
     WaterDetails
 } from "@/types/bill.types";
 import { Order } from '@/types/order.types';
+import { serviceCharge } from '@/constants/serviceCharge';
 
 
 
@@ -31,6 +32,7 @@ const OrderSchema: Schema<Order> = new Schema({
         required: true,
         validate: {
             validator: function (details: BillDetails) {
+                console.log(validateDetails(this.type, details), "validating")
                 return validateDetails(this.type, details);
             },
             message: 'Invalid details structure for this bill type'
@@ -48,7 +50,7 @@ const OrderSchema: Schema<Order> = new Schema({
     amount: {
         type: Number,
         required: true,
-        min: [50, 'Amount must be at least 50 Naira']
+        min: [1000, 'Amount must be at least 1000 Naira']
     },
     status: {
         type: String,
@@ -84,6 +86,7 @@ const OrderSchema: Schema<Order> = new Schema({
 function validateDetails(billType: BillType, details: BillDetails): boolean {
     switch (billType) {
         case BillType.ELECTRICITY:
+            console.log(details, 'details')
             return validateElectricityDetails(details as ElectricityDetails);
         case BillType.AIRTIME:
             return validateAirtimeDetails(details as AirtimeDetails);
@@ -97,11 +100,12 @@ function validateDetails(billType: BillType, details: BillDetails): boolean {
 }
 
 function validateElectricityDetails(details: ElectricityDetails): boolean {
+    console.log(details)
     return !!details.meterNumber &&
         !!details.disco &&
         ['prepaid', 'postpaid'].includes(details.vendType.toLowerCase()) &&
         typeof details.meterNumber === 'string' &&
-        /^\d{10,12}$/.test(details.meterNumber);
+        /^\d{10,13}$/.test(details.meterNumber);
 }
 
 function validateAirtimeDetails(details: AirtimeDetails): boolean {
@@ -131,7 +135,7 @@ OrderSchema.virtual('formattedResponse').get(function () {
     return {
         id: this._id,
         type: this.type,
-        amount: this.amount,
+        amount: this.amount + serviceCharge,
         status: this.status,
         provider: this.provider,
         reference: this.reference,

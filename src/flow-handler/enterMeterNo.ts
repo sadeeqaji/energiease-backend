@@ -67,7 +67,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
           data.disco,
           data.vend_type
         );
-
+        console.log(meterDetails, 'meterDetails')
         return {
           screen: 'ORDER_REVIEW',
           data: {
@@ -85,7 +85,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
         return {
           screen: 'ENTER_METER_NO',
           data: {
-            error_message: error.responseCode === 400 ? error.message : "Please enter a valid date."
+            error_message: error.responseCode >= 400 ? error.message : "Please error occur please try again in a moment"
           },
         };
       }
@@ -93,6 +93,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
 
 
     case "ORDER_REVIEW":
+      console.log(data, 'ORDER_REVIEW')
       try {
         const order = await orderService.createOrder({
           amount: data.amount,
@@ -109,6 +110,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
         })
         if (order.reference && order._id) {
           const { provider, paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order)
+          console.log(paymentUrl, 'payment url')
           return {
             screen: 'PAYMENT',
             data: {

@@ -12,10 +12,11 @@ import { env } from '@/config';
 // import userService from '@/services/user.service';
 import { GET_STARTED, TRANSACTION_IS_BEING_VERIFIED } from '@/constants/whatsapp.flow';
 import { handleEnterMeter } from '@/flow-handler';
+import { getSecret } from '@/utils/getSecretFromAzVault';
 
 const whatsappService = new WhatsAppService();
 
-const { META_APP_SECRET, PRIVATE_KEY, PASSPHRASE } = env;
+const { META_APP_SECRET, PASSPHRASE } = env;
 
 export class WhatsAppController {
   handleWebhook = async (req: FastifyRequest, reply: FastifyReply) => {
@@ -75,7 +76,8 @@ export class WhatsAppController {
 
       let decryptedRequest;
       try {
-        decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+        const PRIVATE_KEY = await getSecret()
+        decryptedRequest = decryptRequest(req.body, PRIVATE_KEY!, PASSPHRASE);
       } catch (err) {
         req.log.error('Error decrypting request:', err);
         if (err instanceof FlowEndpointException) {

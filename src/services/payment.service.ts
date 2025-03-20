@@ -13,8 +13,8 @@ export class PaymentService {
 
     constructor() {
         this.paymentProviders = [
-            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 1 },
-            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 2 },
+            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 2 },
+            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 1 },
         ].sort((a, b) => a.priority - b.priority);
     }
 
@@ -49,16 +49,19 @@ export class PaymentService {
                     }
 
                 } else if (provider.name === 'Paystack') {
+                    const amount = (order.amount * 100).toString();
                     const payload: PaystackInitTransactionPayload = {
-                        amount: order.amount.toString(),
+                        amount,
                         email: 'accounting@mindcolony.tech',
                         reference: order.reference,
                     };
                     paymentResponse = await paystackService.initializeTransaction(payload);
                     const generateBankResponse = await paystackService.generateBankTransfer(
                         {
-                            amount: order.amount.toString(),
+                            amount,
                             email: 'accounting@mindcolony.tech',
+                            reference: order.reference + '1',
+
                         }
                     )
                     console.log(generateBankResponse, 'generateBankResponse')

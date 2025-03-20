@@ -34,8 +34,7 @@ export class OrderService {
         customerPhone: string;
     }): Promise<Order> {
         try {
-            const totalAmount = Number(orderData.amount) + serviceCharge;
-
+            const totalAmount = orderData.amount
             return OrderModel.create({
                 ...orderData,
                 amount: totalAmount,
@@ -45,6 +44,16 @@ export class OrderService {
                 provider: 'none',
                 providerResponse: {}
             });
+            const orderPayload = {
+                ...orderData,
+                amount: totalAmount,
+                status: 'pending_payment',
+                reference: this.generateOrderReference(),
+                retries: 0,
+                provider: 'none',
+                providerResponse: {}
+            }
+            console.log(orderPayload, 'orderPayload')
         } catch (error) {
             throw this.handleServiceError(error);
         }

@@ -8,7 +8,7 @@ export enum BillType {
 export type ElectricityDetails = {
     meterNumber: string;
     disco: string;
-    vendType: 'prepaid' | 'postpaid';
+    vendType: 'PREPAID' | 'POSTPAID';
     meterName?: string;
     meterAddress?: string;
 };
