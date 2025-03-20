@@ -10,7 +10,7 @@ const env = cleanEnv(process.env, {
   VERIFY_TOKEN: str(),
   PASSPHRASE: str(),
   META_APP_SECRET: str(),
-  PRIVATE_KEY: str(),
+  // PRIVATE_KEY: str(),
   BUYPOWER_API_KEY: str(),
   BUYPOWER_BASE_URL: str(),
   MONNIFY_API_KEY: str(),
