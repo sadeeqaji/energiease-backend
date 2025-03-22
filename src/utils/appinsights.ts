@@ -2,7 +2,7 @@ import { env } from "@/config";
 import appInsights from "applicationinsights";
 
 appInsights
-    .setup(env.APPINSIGHTS_INSTRUMENTATION_KEY)
+    .setup(env.APPLICATIONINSIGHTS_CONNECTION_STRING)
     .setAutoDependencyCorrelation(true)
     .setAutoCollectRequests(true)
     .setAutoCollectPerformance(true, true)
