@@ -13,6 +13,7 @@ export interface BankTransferPayload {
     bank_transfer?: {
         account_expires_at: string;
     };
+    metadata?: Record<string, any>;
 }
 
 export interface CardChargePayload {

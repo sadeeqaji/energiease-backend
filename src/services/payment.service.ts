@@ -53,15 +53,18 @@ export class PaymentService {
                     const payload: PaystackInitTransactionPayload = {
                         amount,
                         email: 'accounting@mindcolony.tech',
-                        reference: order.reference,
+                        metadata: {
+                            reference: order.reference,
+                        }
                     };
                     paymentResponse = await paystackService.initializeTransaction(payload);
                     const generateBankResponse = await paystackService.generateBankTransfer(
                         {
                             amount,
                             email: 'accounting@mindcolony.tech',
-                            reference: order.reference + '1',
-
+                            metadata: {
+                                reference: order.reference,
+                            }
                         }
                     )
                     console.log(generateBankResponse, 'generateBankResponse')

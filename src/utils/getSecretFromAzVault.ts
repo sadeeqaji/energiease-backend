@@ -13,8 +13,7 @@ const credential = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging'
         env.AZURE_CLIENT_SECRET!
     );
 
-console.log(env.NODE_ENV, 'env.NODE_ENV')
-console.log(credential, 'credential')
+
 const client = new SecretClient(keyVaultUrl, credential);
 
 export async function getSecret(): Promise<string | undefined> {

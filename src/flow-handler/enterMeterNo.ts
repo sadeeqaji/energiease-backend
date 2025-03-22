@@ -15,7 +15,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
     case "WELCOME_SCREEN":
       if (data.selected_action === 'SAVED_METERS') {
         let error_message;
-        const savedMeters = await meterService.getMetersByPhoneNumber('+2347019438856');
+        const savedMeters = await meterService.getMetersByPhoneNumber(data.phone_number);
         const meters = transformedMeters(savedMeters)
         if (meters.length === 0) {
           error_message = "You don’t have any saved meters yet. To make future purchases faster, enter your meter number now, and we’ll save it for next time!"
@@ -37,6 +37,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
       return {
         screen: 'ENTER_METER_NO',
         data: {
+          phone_number: data.phone_number
         },
       };
       break;
@@ -52,7 +53,8 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
           address: meterDetails?.address,
           amount: data.amount,
           vend_type: meterDetails?.vendType,
-          service_charge: "Service Charge: ₦100"
+          service_charge: "Service Charge: ₦100",
+          phone_number: data.phone_number
         },
       };
 
@@ -67,7 +69,6 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
           data.disco,
           data.vend_type
         );
-        console.log(meterDetails, 'meterDetails')
         return {
           screen: 'ORDER_REVIEW',
           data: {
@@ -77,6 +78,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
             address: meterDetails.address,
             amount: data.amount,
             vend_type: data.vend_type,
+            phone_number: data.phone_number,
             service_charge: "Service Charge: ₦100"
           },
         };
@@ -93,11 +95,10 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
 
 
     case "ORDER_REVIEW":
-      console.log(data, 'ORDER_REVIEW')
       try {
         const order = await orderService.createOrder({
           amount: data.amount,
-          customerPhone: '+2347019438856',
+          customerPhone: data.phone_number,
           details: {
             meterName: data.meter_name,
             meterNumber: data.meter_no,
@@ -105,8 +106,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
             disco: data.disco,
             vendType: data.vend_type,
           },
-          type: BillType.ELECTRICITY,
-          user: '67cb254cf55a6cd19cc61d33'
+          type: BillType.ELECTRICITY
         })
         if (order.reference && order._id) {
           const { provider, paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order)
@@ -116,7 +116,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
             data: {
               account_name: `Account Number: ${bankTransferDetails.accountName}`,
               account_no: `Account Number: ${bankTransferDetails.accountNumber}`,
-              amount: `Account Number: ${order.amount}`,
+              amount: `Account Number: ${order.amount} - ${order.serviceFee}`,
               bank_name: `Bank Name: ${bankTransferDetails.bankName}`,
               valid_until: getMinutesRemaining(bankTransferDetails.expiresOn),
               payment_provider: `Pay with ${provider}`,
@@ -129,21 +129,6 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
       } catch (error) {
         console.log(error, 'initializePayment');
       }
-
-
-    // return {
-    //   screen: 'ORDER_REVIEW',
-    //   data: {
-    //     disco: meterDetails.discoCode,
-    //     meter_no: meterDetails.meterNo,
-    //     meter_name: meterDetails.name,
-    //     address: meterDetails.address,
-    //     amount: data.amount,
-    //     vend_type: data.vend_type,
-    //     service_charge: "Service Charge: ₦100"
-    //   },
-    // };
-    // break;
 
     default:
       return {

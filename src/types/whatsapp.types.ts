@@ -37,7 +37,7 @@ export interface DecryptedResponse {
     disco: string;
     vend_type: string;
     amount: number;
-    service_charge: string;
+    service_charge: number;
     selected_action: 'SAVED_METERS' | 'ENTER_METER_NO',
     selected_meter: string;
   };

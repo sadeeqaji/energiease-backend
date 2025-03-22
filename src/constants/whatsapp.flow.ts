@@ -223,7 +223,7 @@ Thank you for choosing Energiease! ⚡`
 
 
 
-export const SAVED_METER_NO = {
+export const SAVED_METER_NO = () => ({
   messaging_product: "whatsapp",
   recipient_type: "individual",
   to: '+2347019438856',
@@ -253,7 +253,7 @@ export const SAVED_METER_NO = {
         }]
     }
   }
-};
+})
 
 export const expectedEmptyResponse = {
   type: "text",
