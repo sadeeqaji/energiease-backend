@@ -4,7 +4,7 @@ import mongoose, { Schema, Model, Document } from 'mongoose';
 
 const MeterSchema: Schema<Meter> = new Schema({
     meterNumber: { type: String, required: true },
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
     phoneNumber: { type: String, required: true },
     name: { type: String, required: true },
     address: { type: String, required: true },

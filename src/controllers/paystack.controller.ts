@@ -47,10 +47,8 @@ export class PaystackWebhookController {
     }
 
     private async handleSuccessfulCharge(event: SuccessfulChargeEvent): Promise<void> {
-        // Convert amount from kobo to Naira
         const amountPaid = event.data.amount / 100;
-        // Extract payment reference from metadata (adjust based on your implementation)
-        const paymentReference = event.data.metadata?.paymentReference || event.data.reference;
+        const paymentReference = event?.data?.metadata?.reference || event.data.reference;
 
         const vendUnit = await orderService.confirmAndVendOrder(paymentReference, amountPaid);
         console.log('vendUnit', vendUnit);

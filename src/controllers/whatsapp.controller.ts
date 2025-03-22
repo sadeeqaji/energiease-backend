@@ -9,10 +9,10 @@ import {
 } from '@/utils/whatsappEncryption';
 import crypto from 'crypto';
 import { env } from '@/config';
-// import userService from '@/services/user.service';
 import { GET_STARTED, TRANSACTION_IS_BEING_VERIFIED } from '@/constants/whatsapp.flow';
 import { handleEnterMeter } from '@/flow-handler';
 import { getSecret } from '@/utils/getSecretFromAzVault';
+import userService from '@/services/user.service';
 
 const whatsappService = new WhatsAppService();
 
@@ -43,6 +43,11 @@ export class WhatsAppController {
 
       req.log.info(`📩 Received message: "${messageText}" from ${from}`);
       const data = GET_STARTED(from)
+      const existingUser = await userService.getUserByIdentifier(from);
+      if (!existingUser) {
+        await userService.createUser(from);
+        req.log.info(`New user created: ${from}`);
+      }
       await whatsappService.sendMessage(data);
       return reply.status(200).send({ status: 'Message processed' });
     } catch (error) {
@@ -102,7 +107,6 @@ export class WhatsAppController {
       );
       return reply.send(encryptedResponse);
     } catch (error) {
-      console.log(error, "Whatsapp flow")
       req.log.error('Error processing WhatsApp Flow webhook:', error);
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
@@ -139,7 +143,7 @@ export class WhatsAppController {
 
   private getNextScreen = async (decryptedBody: DecryptedResponse) => {
     const { action, flow_token } = decryptedBody;
-    console.log(decryptedBody, '====decryptedBody===')
+    // console.log(decryptedBody, '====decryptedBody===')
     if (action === 'ping') {
       return {
         data: {

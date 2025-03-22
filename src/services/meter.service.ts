@@ -1,5 +1,4 @@
 import { MeterModel } from '@/models/meter.model';
-import { Meter } from '@/types/meter.types';
 
 class MeterService {
     async getMeter({ id, meterNumber, userId, phoneNumber }: {
@@ -19,7 +18,7 @@ class MeterService {
     }
 
     async saveMeter(meterData: {
-        user: string;
+        user?: string;
         phoneNumber: string;
         meterNumber: string;
         name: string;
@@ -29,7 +28,6 @@ class MeterService {
     }) {
         const existingMeter = await this.getMeter({
             meterNumber: meterData.meterNumber,
-            userId: meterData.user,
             phoneNumber: meterData.phoneNumber
         });
 

@@ -9,6 +9,7 @@ export interface Order extends Document {
     provider: 'buypower' | 'vtpass' | 'none';
     providerResponse: Record<string, unknown>;
     amount: number;
+    serviceFee: number;
     status: 'pending_payment' | 'processing' | 'success' | 'failed';
     retries: number;
     providerOrderId?: string;
