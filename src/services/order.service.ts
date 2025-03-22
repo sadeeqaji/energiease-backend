@@ -4,7 +4,7 @@ import { AppException } from '@/utils/appException.utils';
 import { Order } from '@/types/order.types';
 import { BillProvider, BillType, ElectricityDetails } from '@/types/bill.types';
 import crypto from "crypto";
-import { serviceCharge } from '@/constants/serviceCharge';
+import { serviceFee } from '@/constants/serviceFee';
 import meterService from './meter.service';
 
 export class OrderService {
@@ -27,33 +27,23 @@ export class OrderService {
      * Create a pending order before payment confirmation
      */
     async createOrder(orderData: {
-        user: string;
         type: BillType;
         details: Record<string, any>;
         amount: number;
         customerPhone: string;
     }): Promise<Order> {
         try {
-            const totalAmount = orderData.amount
+            const totalAmount = Number(orderData.amount) + Number(serviceFee);
             return OrderModel.create({
                 ...orderData,
                 amount: totalAmount,
+                serviceFee,
                 status: 'pending_payment',
                 reference: this.generateOrderReference(),
                 retries: 0,
                 provider: 'none',
                 providerResponse: {}
             });
-            const orderPayload = {
-                ...orderData,
-                amount: totalAmount,
-                status: 'pending_payment',
-                reference: this.generateOrderReference(),
-                retries: 0,
-                provider: 'none',
-                providerResponse: {}
-            }
-            console.log(orderPayload, 'orderPayload')
         } catch (error) {
             throw this.handleServiceError(error);
         }
@@ -63,7 +53,6 @@ export class OrderService {
      * Confirm payment and execute the vending process
      */
     async confirmAndVendOrder(reference: string, amount: number): Promise<Order | null> {
-        console.log(reference, 'reference')
         try {
             const order = await OrderModel.findOne({ reference });
             if (!order) {
@@ -89,8 +78,9 @@ export class OrderService {
                     if (provider.validate) {
                         await provider.validate(order.details);
                     }
+                    const providerAmount = order.amount - order.serviceFee;
                     const result = await provider.vend({
-                        amount,
+                        amount: providerAmount,
                         billType: order.type,
                         orderReference: order.reference,
                         details: order.details,
@@ -112,7 +102,7 @@ export class OrderService {
                                 meterNumber: electricityDetails.meterNumber,
                                 name: electricityDetails.meterName!,
                                 phoneNumber: order.customerPhone,
-                                user: order?.user.toString(),
+                                user: order?.user?.toString(),
                                 vendType: electricityDetails.vendType
                             });
                             console.log(`New meter saved: ${electricityDetails.meterNumber}`);
@@ -152,7 +142,6 @@ export class OrderService {
             .exec();
     }
 
-    // ... keep other methods (getOrders, retryFailedOrder, countOrders) the same ...
 
     private async markOrderSuccess(order: Order, provider: string, providerOrderId?: string): Promise<Order | null> {
         return OrderModel.findByIdAndUpdate(

@@ -1,1 +1,0 @@
-export const serviceCharge = 100

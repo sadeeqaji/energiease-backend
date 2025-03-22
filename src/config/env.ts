@@ -17,7 +17,7 @@ const env = cleanEnv(process.env, {
   MONNIFY_CONTRACT_CODE: str(),
   MONNIFY_TIMEOUT: str(),
   PAYSTACK_SECRET_KEY: str(),
-  APPINSIGHTS_INSTRUMENTATION_KEY: str(),
+  APPLICATIONINSIGHTS_CONNECTION_STRING: str(),
   KEY_VAULT_URL: str(),
   AZURE_TENANT_ID: str({ default: undefined }),
   AZURE_CLIENT_ID: str({ default: undefined }),

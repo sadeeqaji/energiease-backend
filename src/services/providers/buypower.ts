@@ -31,7 +31,7 @@ export class BuyPowerProvider implements BillProvider {
                     disco: data.data.disco,
                     meterNumber: details.meterNumber,
                     orderReference: orderReference,
-                    to: '+2347019438856',
+                    to: userInfo.phone,
                     token: data.data.token,
                     unit: data.data.units
                 }
