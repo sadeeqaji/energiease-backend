@@ -13,8 +13,8 @@ export class PaymentService {
 
     constructor() {
         this.paymentProviders = [
-            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 2 },
-            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 1 },
+            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 1 },
+            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 2 },
         ].sort((a, b) => a.priority - b.priority);
     }
 

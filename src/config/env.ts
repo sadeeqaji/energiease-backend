@@ -9,6 +9,7 @@ const env = cleanEnv(process.env, {
   WHATSAPP_PHONE_ID: str(),
   VERIFY_TOKEN: str(),
   PASSPHRASE: str(),
+  PRIVATE_KEY: str({ default: undefined }),
   META_APP_SECRET: str(),
   BUYPOWER_API_KEY: str(),
   BUYPOWER_BASE_URL: str(),

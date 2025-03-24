@@ -18,6 +18,9 @@ const client = new SecretClient(keyVaultUrl, credential);
 
 export async function getSecret(): Promise<string | undefined> {
     try {
+        if (env.NODE_ENV !== 'production') {
+            return env.PRIVATE_KEY
+        }
         const secret = await client.getSecret(secretName);
         return secret.value;
     } catch (error) {

@@ -10,7 +10,6 @@ import { getMinutesRemaining } from '@/utils/time';
 
 export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
   const { data, screen } = decryptedBody;
-
   switch (screen) {
     case "WELCOME_SCREEN":
       if (data.selected_action === 'SAVED_METERS') {
@@ -108,6 +107,7 @@ export const handleEnterMeter = async (decryptedBody: DecryptedResponse) => {
           },
           type: BillType.ELECTRICITY
         })
+        console.log(data, 'data====')
         if (order.reference && order._id) {
           const { provider, paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order)
           console.log(paymentUrl, 'payment url')

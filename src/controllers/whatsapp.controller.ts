@@ -143,7 +143,6 @@ export class WhatsAppController {
 
   private getNextScreen = async (decryptedBody: DecryptedResponse) => {
     const { action, flow_token } = decryptedBody;
-    // console.log(decryptedBody, '====decryptedBody===')
     if (action === 'ping') {
       return {
         data: {
