@@ -9,6 +9,7 @@ import successResponsePlugin from './plugins/successResponse.plugin';
 import { corsOptions } from './constants/cor';
 import { env } from './config';
 import redisPlugin from './plugins/redis.plugin';
+import serviceBusPlugin from './plugins/serviceBus.plugin';
 
 const fastify = Fastify({
   logger: {
@@ -37,6 +38,7 @@ fastify.setErrorHandler(errorHandler);
 fastify.register(successResponsePlugin);
 fastify.register(cors, corsOptions);
 
+fastify.register(serviceBusPlugin);
 fastify.register(redisPlugin);
 fastify.register(import('@fastify/sensible'));
 fastify.register(swaggerPlugin);

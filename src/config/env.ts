@@ -26,6 +26,7 @@ const env = cleanEnv(process.env, {
   FLOW_ID: str(),
   REDIS_CONNECTION_STRING: str(),
   REDIS_ACCESS_KEY: str(),
+  SERVICE_BUS_CONNECTION_STRING: str()
 });
 
 export default env;

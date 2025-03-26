@@ -1,4 +1,3 @@
-// src/plugins/redis.plugin.ts
 import { env } from '@/config';
 import fp from 'fastify-plugin';
 import { createClient, type RedisClientType } from 'redis';
@@ -16,7 +15,10 @@ declare module 'fastify' {
                 options?: { ttl?: number; nx?: boolean }
             ) => Promise<'OK' | null>;
             get: (key: string) => Promise<string | null>;
+            exists: (key: string) => Promise<boolean>;
+            expire: (key: string, seconds: number) => Promise<boolean>;
             del: (key: string | string[]) => Promise<number>;
+            incr: (key: string) => Promise<number>;
             disconnect: () => Promise<void>;
             isConnected: () => boolean;
         };
@@ -74,6 +76,35 @@ export default fp(async (fastify) => {
                 return client.get(key);
             } catch (err) {
                 fastify.log.error(`Redis GET error for key ${key}:`, err);
+                throw err;
+            }
+        },
+
+        exists: async (key: string) => {
+            try {
+                const count = await client.exists(key);
+                return count === 1;
+            } catch (err) {
+                fastify.log.error(`Redis EXISTS error for key ${key}:`, err);
+                throw err;
+            }
+        },
+
+        expire: async (key: string, seconds: number) => {
+            try {
+                const result = await client.expire(key, seconds);
+                return result;
+            } catch (err) {
+                fastify.log.error(`Redis EXPIRE error for key ${key}:`, err);
+                throw err;
+            }
+        },
+
+        incr: async (key: string) => {
+            try {
+                return await client.incr(key);
+            } catch (err) {
+                fastify.log.error(`Redis INCR error for key ${key}:`, err);
                 throw err;
             }
         },

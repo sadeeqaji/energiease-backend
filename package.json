@@ -21,6 +21,7 @@
   "description": "",
   "dependencies": {
     "@azure/keyvault-secrets": "^4.9.0",
+    "@azure/service-bus": "^7.9.5",
     "@fastify/cors": "^11.0.0",
     "@fastify/sensible": "^6.0.3",
     "@fastify/swagger": "^9.4.2",
