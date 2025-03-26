@@ -1,7 +1,5 @@
-import { MonnifyConfig } from '@/config/monnify.config';
 import monnifyService, { MonnifyService } from './monnify.service';
 import paystackService, { PaystackService } from './paystack.service';
-import { AppException } from '@/utils/appException.utils';
 import { MonnifyInitTransactionPayload } from '@/types/monnify.types';
 import { PaystackInitTransactionPayload } from '@/types/paystack.types';
 import { transformBankDetails } from '@/utils/payment';
@@ -67,11 +65,8 @@ export class PaymentService {
                             }
                         }
                     )
-                    console.log(generateBankResponse, 'generateBankResponse')
                     bankTransferDetails = transformBankDetails('Paystack', generateBankResponse)
-
                 }
-
                 if (paymentResponse && bankTransferDetails) {
                     return {
                         paymentUrl: paymentResponse.authorization_url || makeValidURI(paymentResponse.checkoutUrl),
@@ -84,35 +79,8 @@ export class PaymentService {
                 console.error(`[${provider.name}] Payment initialization failed:`, error);
             }
         }
-
         throw lastError || new Error('All payment providers failed');
     }
-
-    /**
-     * Verify payment using the provider
-     */
-    // async verifyPayment(reference: string, provider: string): Promise<boolean> {
-    //     const paymentProvider = this.paymentProviders.find(p => p.name === provider);
-
-    //     if (!paymentProvider) {
-    //         throw AppException.BadRequest('Invalid payment provider');
-    //     }
-
-    //     try {
-    //         if (paymentProvider.name === 'monnify') {
-    //             const transaction = await paymentProvider.service.verifyTransaction(reference);
-    //             return transaction.status === 'PAID';
-    //         } else if (paymentProvider.name === 'paystack') {
-    //             const transaction = await paymentProvider.service.verifyTransaction(reference);
-    //             return transaction.status === 'success';
-    //         }
-    //     } catch (error) {
-    //         console.error(`[${provider}] Payment verification failed:`, error);
-    //         throw AppException.InternalServerError('Payment verification failed');
-    //     }
-
-    //     return false;
-    // }
 }
 
 export default new PaymentService();

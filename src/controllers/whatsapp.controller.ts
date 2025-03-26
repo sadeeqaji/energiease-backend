@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { WhatsAppService } from '@/services/whatsapp.service';
 import { DecryptedResponse, WhatsAppEntry } from '@/types/whatsapp.types';
 import {
@@ -15,10 +15,14 @@ import { getSecret } from '@/utils/getSecretFromAzVault';
 import userService from '@/services/user.service';
 
 const whatsappService = new WhatsAppService();
-
 const { META_APP_SECRET, PASSPHRASE } = env;
 
 export class WhatsAppController {
+  private readonly fastify: FastifyInstance;
+
+  constructor(fastify: FastifyInstance) {
+    this.fastify = fastify;
+  }
   handleWebhook = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
       const { entry } = req.body as WhatsAppEntry;
@@ -26,30 +30,54 @@ export class WhatsAppController {
         req.log.warn('Invalid webhook payload');
         return reply.status(400).send({ error: 'Invalid payload' });
       }
+
       const messageData = entry[0]?.changes[0]?.value?.messages?.[0];
+      if (!messageData) {
+        return reply.status(200).send({ status: 'No message data' });
+      }
+
+      const messageKey = `whatsapp:msg:${messageData.id}`;
+      try {
+        const isNewMessage = await req.server.redis.set(messageKey, '1', { ttl: 300 });
+        if (isNewMessage === null) {
+          req.log.info(`Duplicate message detected: ${messageData.id}`);
+          return reply.status(200).send({ status: 'Duplicate message ignored' });
+        }
+      } catch (redisError) {
+        console.log(redisError, 'redisError')
+        req.log.error('Redis deduplication failed, proceeding anyway:', redisError);
+
+      }
+
       const responseJson = messageData?.interactive?.nfm_reply?.response_json;
       const flowResponse = responseJson ? JSON.parse(responseJson) : null;
+
       if (flowResponse && messageData?.from) {
-        const data = TRANSACTION_IS_BEING_VERIFIED({ to: messageData?.from, orderReference: flowResponse.order_reference })
+        const data = TRANSACTION_IS_BEING_VERIFIED({
+          to: messageData.from,
+          orderReference: flowResponse.order_reference,
+        });
         await whatsappService.sendMessage(data);
         return reply.status(200).send({ status: 'Message processed' });
       }
 
-      if (!messageData) {
-        return reply.status(200).send({ status: 'No message data' });
-      }
+
       const { from, text } = messageData;
       const messageText = text?.body || 'No text';
-
       req.log.info(`📩 Received message: "${messageText}" from ${from}`);
-      const data = GET_STARTED(from)
+
+
       const existingUser = await userService.getUserByIdentifier(from);
       if (!existingUser) {
         await userService.createUser(from);
         req.log.info(`New user created: ${from}`);
       }
+
+
+      const data = GET_STARTED(from);
       await whatsappService.sendMessage(data);
       return reply.status(200).send({ status: 'Message processed' });
+
     } catch (error) {
       req.log.error('Error processing WhatsApp webhook:', error);
       return reply.status(500).send({ error: 'Internal Server Error' });
@@ -61,13 +89,14 @@ export class WhatsAppController {
     const mode = query['hub.mode'];
     const token = query['hub.verify_token'];
     const challenge = query['hub.challenge'];
+
     if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
       req.log.info('Webhook verified successfully');
       return reply.status(200).send(challenge);
-    } else {
-      req.log.warn('Webhook verification failed');
-      return reply.status(403).send({ error: 'Forbidden' });
     }
+
+    req.log.warn('Webhook verification failed');
+    return reply.status(403).send({ error: 'Forbidden' });
   };
 
   handleFlowWebhook = async (
@@ -81,7 +110,7 @@ export class WhatsAppController {
 
       let decryptedRequest;
       try {
-        const PRIVATE_KEY = await getSecret()
+        const PRIVATE_KEY = await getSecret();
         decryptedRequest = decryptRequest(req.body, PRIVATE_KEY!, PASSPHRASE);
       } catch (err) {
         req.log.error('Error decrypting request:', err);
@@ -91,13 +120,11 @@ export class WhatsAppController {
         return reply.status(500).send(err);
       }
 
-      const { aesKeyBuffer, initialVectorBuffer, decryptedBody } =
-        decryptedRequest;
+      const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
       req.log.info(`💬 Decrypted Request: ${JSON.stringify(decryptedBody)}`);
+
       const screenResponse: Record<string, unknown> =
-        (await this.getNextScreen(
-          decryptedBody as unknown as DecryptedResponse,
-        )) || {};
+        (await this.getNextScreen(decryptedBody as unknown as DecryptedResponse)) || {};
       req.log.info(`👉 Response to Encrypt: ${JSON.stringify(screenResponse)}`);
 
       const encryptedResponse = encryptResponse(
@@ -125,10 +152,8 @@ export class WhatsAppController {
     }
 
     const signatureBuffer = Buffer.from(
-      (Array.isArray(signatureHeader)
-        ? signatureHeader[0]
-        : signatureHeader
-      ).replace('sha256=', ''),
+      (Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader)
+        .replace('sha256=', ''),
       'utf-8',
     );
     const hmac = crypto.createHmac('sha256', META_APP_SECRET);
@@ -144,17 +169,14 @@ export class WhatsAppController {
   private getNextScreen = async (decryptedBody: DecryptedResponse) => {
     const { action, flow_token } = decryptedBody;
     if (action === 'ping') {
-      return {
-        data: {
-          status: 'active',
-        },
-      };
+      return { data: { status: 'active' } };
     }
 
     switch (flow_token) {
       case 'menu':
-        return handleEnterMeter(decryptedBody);
-        break;
+        return handleEnterMeter(decryptedBody, this.fastify);
+      default:
+        return null;
     }
   };
 }

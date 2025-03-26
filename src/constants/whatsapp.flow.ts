@@ -109,72 +109,72 @@ export const GET_STARTED = (to: string) => ({
 });
 
 
-export const ELECTRICITY_PURCHASE_CONFIRMATION = ({
-  to,
-  amount,
-  meterNumber,
-  disco,
-  token,
-  unit,
-  orderReference,
-}: ElectricityPurchaseConfirmationParams) => ({
-  messaging_product: 'whatsapp',
-  to,
-  type: 'template',
-  "template": {
-    "name": "electricity_purchased_confirmed",
-    "language": {
-      "code": "en"
-    },
-    "components": [
-      {
-        "type": "body",
-        "parameters": [
-          {
-            type: "text",
-            parameter_name: "1",
-            "text": amount
-          },
-          {
-            type: "text",
-            parameter_name: "2",
-            "text": token
-          },
-          {
-            "type": "text",
-            parameter_name: "3",
-            "text": unit
-          },
-          {
-            "type": "text",
-            parameter_name: "4",
-            "text": amount
-          },
-          {
-            "type": "text",
-            parameter_name: "5",
-            "text": meterNumber
-          },
-          {
-            "type": "text",
-            parameter_name: "6",
-            "text": disco
-          },
-          {
-            "type": "text",
-            parameter_name: "7",
-            "text": orderReference
-          },
-          {
-            "type": "text",
-            parameter_name: "8",
-            "text": "+2347067307317"
-          }
-        ]
-      }
-    ]
-  }
-});
+// export const ELECTRICITY_PURCHASE_CONFIRMATION = ({
+//   to,
+//   amount,
+//   meterNumber,
+//   disco,
+//   token,
+//   unit,
+//   orderReference,
+// }: ElectricityPurchaseConfirmationParams) => ({
+//   messaging_product: 'whatsapp',
+//   to,
+//   type: 'template',
+//   "template": {
+//     "name": "electricity_purchased_confirmed",
+//     "language": {
+//       "code": "en"
+//     },
+//     "components": [
+//       {
+//         "type": "body",
+//         "parameters": [
+//           {
+//             type: "text",
+//             parameter_name: "1",
+//             "text": amount
+//           },
+//           {
+//             type: "text",
+//             parameter_name: "2",
+//             "text": token
+//           },
+//           {
+//             "type": "text",
+//             parameter_name: "3",
+//             "text": unit
+//           },
+//           {
+//             "type": "text",
+//             parameter_name: "4",
+//             "text": amount
+//           },
+//           {
+//             "type": "text",
+//             parameter_name: "5",
+//             "text": meterNumber
+//           },
+//           {
+//             "type": "text",
+//             parameter_name: "6",
+//             "text": disco
+//           },
+//           {
+//             "type": "text",
+//             parameter_name: "7",
+//             "text": orderReference
+//           },
+//           {
+//             "type": "text",
+//             parameter_name: "8",
+//             "text": "+2347067307317"
+//           }
+//         ]
+//       }
+//     ]
+//   }
+// });
 
 
 
@@ -259,3 +259,37 @@ export const expectedEmptyResponse = {
   type: "text",
   text: "You don't have any saved meters. Please enter a new meter to purchase electricity."
 };
+
+
+export const ELECTRICITY_PURCHASE_CONFIRMATION = ({
+  to,
+  amount,
+  meterNumber,
+  disco,
+  token,
+  unit,
+  orderReference,
+}: ElectricityPurchaseConfirmationParams) => ({
+  messaging_product: 'whatsapp',
+  to,
+  type: 'text',
+  text: {
+    body: `ELECTRICITY PURCHASE CONFIRMED! ⚡
+Your payment of ₦${amount} for electricity was successful!💡
+——————————————
+🔌 TRANSACTION DETAILS  
+→ Token: ${token}  
+→ Number of Units: ${unit}  
+→ Amount Paid: ₦${amount}  
+→ Meter Number: ${meterNumber}  
+→ Disco: ${disco}  
+→ Transaction ID: ${orderReference}  
+——————————————
+📲 NEED HELP?  
+Reply HELP or reach us via:  
+📞 +2347067307317  
+📩 support@energiease.ng  
+
+Thank you for choosing Energiease! 🚀`,
+  },
+});

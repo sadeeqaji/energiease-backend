@@ -1,5 +1,6 @@
 
 export interface WhatsAppMessage {
+  id: string
   from: string;
   text?: { body: string };
   interactive: Record<string, any>;
@@ -40,6 +41,7 @@ export interface DecryptedResponse {
     service_charge: number;
     selected_action: 'SAVED_METERS' | 'ENTER_METER_NO',
     selected_meter: string;
+    order_reference: string;
   };
   flow_token: string;
   screen: string;

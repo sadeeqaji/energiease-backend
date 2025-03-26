@@ -23,7 +23,9 @@ const env = cleanEnv(process.env, {
   AZURE_TENANT_ID: str({ default: undefined }),
   AZURE_CLIENT_ID: str({ default: undefined }),
   AZURE_CLIENT_SECRET: str({ default: undefined }),
-  FLOW_ID: str()
+  FLOW_ID: str(),
+  REDIS_CONNECTION_STRING: str(),
+  REDIS_ACCESS_KEY: str(),
 });
 
 export default env;
