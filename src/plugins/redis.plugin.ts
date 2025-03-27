@@ -27,7 +27,7 @@ declare module 'fastify' {
 }
 
 export default fp(async (fastify) => {
-    const isProduction = env.NODE_ENV === 'production';
+    const isProduction = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
     const redisConfig = {
         url: isProduction ? env.AZURE_REDIS_CONNECTIONSTRING : env.REDIS_CONNECTION_STRING,
         socket: {
@@ -42,14 +42,12 @@ export default fp(async (fastify) => {
 
     const client: RedisClientType = createClient(redisConfig);
 
-    // Error handling
     client.on('error', (err) => fastify.log.error(`Redis error: ${err}`));
     client.on('connect', () => fastify.log.info('Connecting to Redis...'));
     client.on('ready', () => fastify.log.info('✅ Redis connected'));
     client.on('reconnecting', () => fastify.log.warn('Redis reconnecting...'));
     client.on('end', () => fastify.log.warn('Redis connection closed'));
 
-    // Connect to Redis
     try {
         await client.connect();
     } catch (err) {
