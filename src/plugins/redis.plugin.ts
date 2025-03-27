@@ -19,6 +19,7 @@ declare module 'fastify' {
             expire: (key: string, seconds: number) => Promise<boolean>;
             del: (key: string | string[]) => Promise<number>;
             incr: (key: string) => Promise<number>;
+
             disconnect: () => Promise<void>;
             isConnected: () => boolean;
         };
@@ -26,16 +27,20 @@ declare module 'fastify' {
 }
 
 export default fp(async (fastify) => {
-    const client: RedisClientType = createClient({
-        url: env.REDIS_CONNECTION_STRING,
-        password: env.REDIS_ACCESS_KEY,
+    const isProduction = env.NODE_ENV === 'production';
+    const redisConfig = {
+        url: isProduction ? env.AZURE_REDIS_CONNECTIONSTRING : env.REDIS_CONNECTION_STRING,
         socket: {
-            tls: true,
-            connectTimeout: 5000,
-            reconnectStrategy: (retries) => Math.min(retries * 100, 5000)
+            tls: isProduction ? true : undefined,
+            connectTimeout: isProduction ? 15000 : 5000,
+            reconnectStrategy: (retries: number) =>
+                Math.min(retries * (isProduction ? 200 : 100), isProduction ? 10000 : 5000)
         },
-        pingInterval: 30000
-    });
+        ...(isProduction ? {} : { password: env.REDIS_ACCESS_KEY }),
+        pingInterval: isProduction ? 15000 : 30000
+    };
+
+    const client: RedisClientType = createClient(redisConfig);
 
     // Error handling
     client.on('error', (err) => fastify.log.error(`Redis error: ${err}`));
@@ -59,7 +64,7 @@ export default fp(async (fastify) => {
                 if (options?.nx) {
                     const result = await client.set(key, value, {
                         NX: true,
-                        ...(options?.ttl && { EX: options.ttl }) // Add EX if ttl provided
+                        ...(options?.ttl && { EX: options.ttl })
                     });
                     return result === 'OK' ? 'OK' : null;
                 }

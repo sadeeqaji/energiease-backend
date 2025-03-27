@@ -20,6 +20,7 @@ const env = cleanEnv(process.env, {
   PAYSTACK_SECRET_KEY: str(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: str(),
   KEY_VAULT_URL: str(),
+  AZURE_REDIS_CONNECTIONSTRING: str(),
   AZURE_TENANT_ID: str({ default: undefined }),
   AZURE_CLIENT_ID: str({ default: undefined }),
   AZURE_CLIENT_SECRET: str({ default: undefined }),

@@ -133,16 +133,16 @@ export class MonnifyWebhookController {
         try {
             // 1. IP Whitelist Verification
             const clientIp = request.ip || (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim();
-            if (!await this.isWhitelistedIp(clientIp)) {
-                this.fastify.log.warn(`Unauthorized IP attempt: ${clientIp}`);
-                throw AppException.Unauthorized('IP not whitelisted');
-            }
+            // if (!await this.isWhitelistedIp(clientIp)) {
+            //     this.fastify.log.warn(`Unauthorized IP attempt: ${clientIp}`);
+            //     throw AppException.Unauthorized('IP not whitelisted');
+            // }
 
             // 2. Rate Limiting
-            if (!await this.checkRequestRate(clientIp)) {
-                this.fastify.log.warn(`Rate limit exceeded for IP: ${clientIp}`);
-                throw AppException.BadRequest('Too many requests');
-            }
+            // if (!await this.checkRequestRate(clientIp)) {
+            //     this.fastify.log.warn(`Rate limit exceeded for IP: ${clientIp}`);
+            //     throw AppException.BadRequest('Too many requests');
+            // }
 
             // 3. Signature Validation
             const rawBody = request.rawBody!;
