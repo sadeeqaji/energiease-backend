@@ -33,6 +33,7 @@ export default fp(async (fastify) => {
         socket: {
             tls: isProduction ? true : undefined,
             connectTimeout: isProduction ? 15000 : 5000,
+            servername: 'redis-energiease-prod-weu.redis.cache.windows.net',
             reconnectStrategy: (retries: number) =>
                 Math.min(retries * (isProduction ? 200 : 100), isProduction ? 10000 : 5000)
         },
