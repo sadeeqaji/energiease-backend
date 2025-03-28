@@ -1,4 +1,5 @@
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
+import { serviceFee } from '@/constants/serviceFee';
 import buyPowerService from '@/services/buypower.service';
 import meterService from '@/services/meter.service';
 import orderService from '@/services/order.service';
@@ -100,11 +101,14 @@ async function handleSavedMeters(data: any, fastify: FastifyInstance) {
   const cachedMeterDetails = await fastify.redis.get(meterCacheKey);
 
   if (cachedMeterDetails) {
+    const total_amount = Number(data.amount) + serviceFee
     return {
       screen: 'ORDER_REVIEW',
       data: {
         ...JSON.parse(cachedMeterDetails),
-        amount: data.amount,
+        amount: data.amount.toLocaleString(),
+        total_amount: total_amount.toLocaleString(),
+        service_charge: serviceFee.toLocaleString(),
         phone_number: data.phone_number
       }
     };
@@ -126,22 +130,27 @@ async function handleSavedMeters(data: any, fastify: FastifyInstance) {
     meter_name: meterDetails.name,
     address: meterDetails.address,
     vend_type: meterDetails.vendType,
-    service_charge: "Service Charge: ₦100"
+    service_charge: serviceFee.toLocaleString()
   };
 
   await fastify.redis.set(meterCacheKey, JSON.stringify(reviewData), { ttl: 86400 });
+  const total_amount = Number(data.amount) + serviceFee
 
   return {
     screen: 'ORDER_REVIEW',
     data: {
       ...reviewData,
-      amount: data.amount,
+      amount: data.amount.toLocaleString(),
+      total_amount: total_amount.toLocaleString(),
+      service_charge: serviceFee.toLocaleString(),
       phone_number: data.phone_number
     }
   };
 }
 
 async function handleNewMeter(data: any, fastify: FastifyInstance) {
+  console.log(data, 'data')
+
   if (!data?.meter_no || !data?.disco || !data?.vend_type) {
     throw AppException.BadRequest('Missing required parameters');
   }
@@ -149,13 +158,16 @@ async function handleNewMeter(data: any, fastify: FastifyInstance) {
   // Check for cached meter details first
   const meterCacheKey = `${REDIS_PREFIXES.METER_CACHE_PREFIX}detail:${data.meter_no}:${data.disco}`;
   const cachedMeterDetails = await fastify.redis.get(meterCacheKey);
-
+  console.log(data, 'data')
   if (cachedMeterDetails) {
+    const total_amount = Number(data.amount) + serviceFee
     return {
       screen: 'ORDER_REVIEW',
       data: {
         ...JSON.parse(cachedMeterDetails),
-        amount: data.amount,
+        amount: data.amount.toLocaleString(),
+        total_amount: total_amount.toLocaleString(),
+        service_charge: serviceFee.toLocaleString(),
         phone_number: data.phone_number
       }
     };
@@ -172,12 +184,16 @@ async function handleNewMeter(data: any, fastify: FastifyInstance) {
   if (isDuplicateValidation === null) {
     // Double-check cache in case validation completed
     const recentlyCachedDetails = await fastify.redis.get(meterCacheKey);
+    const total_amount = Number(data.amount) + serviceFee
+
     if (recentlyCachedDetails) {
       return {
         screen: 'ORDER_REVIEW',
         data: {
           ...JSON.parse(recentlyCachedDetails),
-          amount: data.amount,
+          amount: data.amount.toLocaleString(),
+          total_amount: total_amount.toLocaleString(),
+          service_charge: serviceFee.toLocaleString(),
           phone_number: data.phone_number
         }
       };
@@ -190,7 +206,8 @@ async function handleNewMeter(data: any, fastify: FastifyInstance) {
         meter_no: data.meter_no,
         disco: data.disco,
         vend_type: data.vend_type,
-        phone_number: data.phone_number
+        phone_number: data.phone_number,
+        total_amount: total_amount.toLocaleString(),
       },
     };
   }
@@ -209,16 +226,17 @@ async function handleNewMeter(data: any, fastify: FastifyInstance) {
       meter_name: meterDetails.name,
       address: meterDetails.address,
       vend_type: data.vend_type,
-      service_charge: "Service Charge: ₦100"
     };
 
     await fastify.redis.set(meterCacheKey, JSON.stringify(reviewData), { ttl: 86400 });
-
+    const total_amount = Number(data.amount) + serviceFee
     return {
       screen: 'ORDER_REVIEW',
       data: {
         ...reviewData,
-        amount: data.amount,
+        amount: data.amount.toLocaleString(),
+        service_charge: serviceFee.toLocaleString(),
+        total_amount: total_amount.toLocaleString(),
         phone_number: data.phone_number
       },
     };
@@ -270,7 +288,6 @@ async function handleOrderReview(data: any, fastify: FastifyInstance) {
       type: BillType.ELECTRICITY
     });
 
-    console.log(data.action)
 
     if (order.reference && order._id) {
       const { provider, paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order);
@@ -279,13 +296,15 @@ async function handleOrderReview(data: any, fastify: FastifyInstance) {
         JSON.stringify(bankTransferDetails),
         { ttl: 1800 }
       );
+      const total_amount = Number(data.amount) + serviceFee
 
       return {
         screen: 'PAYMENT',
         data: {
           account_name: bankTransferDetails.accountName,
           account_no: bankTransferDetails.accountNumber,
-          amount: `₦${order.amount} (Fee: ₦${order.serviceFee})`,
+          amount: order.amount.toLocaleString(),
+          total_amount: total_amount.toLocaleString(),
           bank_name: bankTransferDetails.bankName,
           valid_until: getMinutesRemaining(bankTransferDetails.expiresOn),
           payment_provider: provider,

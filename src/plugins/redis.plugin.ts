@@ -41,6 +41,8 @@ export default fp(async (fastify) => {
         pingInterval: isProduction ? 15000 : 30000
     };
 
+    console.log(redisConfig, 'redisConfig')
+
     const client: RedisClientType = createClient(redisConfig);
 
     client.on('error', (err) => fastify.log.error(`Redis error: ${err}`));

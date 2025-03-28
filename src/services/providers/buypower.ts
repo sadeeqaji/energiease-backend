@@ -21,7 +21,7 @@ export class BuyPowerProvider implements BillProvider {
         details.reference = orderReference
         try {
             const { data } = await axios.post(
-                `${BuyPowerConfig.baseUrl}/vend`,
+                `${BuyPowerConfig.baseUrl}/vend?strict=0`,
                 this.createElectricityPayload(details, userInfo),
                 { headers: { Authorization: `Bearer ${BuyPowerConfig.apiKey}` } }
             );
