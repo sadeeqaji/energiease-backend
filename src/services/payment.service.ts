@@ -5,15 +5,19 @@ import { PaystackInitTransactionPayload } from '@/types/paystack.types';
 import { transformBankDetails } from '@/utils/payment';
 import { BankDetails, PaymentProviders } from '@/types/payment.types';
 import { makeValidURI } from '@/utils/url';
+import { FastifyInstance } from 'fastify';
 
 export class PaymentService {
     private paymentProviders: { name: PaymentProviders; service: MonnifyService | PaystackService; priority: number }[];
+    private readonly fastify: FastifyInstance;
 
-    constructor() {
+    constructor(fastify: FastifyInstance) {
         this.paymentProviders = [
-            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 1 },
-            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 2 },
+            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 2 },
+            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 1 },
         ].sort((a, b) => a.priority - b.priority);
+        this.fastify = fastify;
+
     }
 
     /**
@@ -83,4 +87,4 @@ export class PaymentService {
     }
 }
 
-export default new PaymentService();
+// export default new PaymentService();

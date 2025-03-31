@@ -1,5 +1,4 @@
 import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
-import { WhatsAppService } from '@/services/whatsapp.service';
 import { DecryptedResponse, WhatsAppEntry } from '@/types/whatsapp.types';
 import {
   decryptRequest,
@@ -14,7 +13,6 @@ import { handleEnterMeter } from '@/flow-handler';
 import { getSecret } from '@/utils/getSecretFromAzVault';
 import userService from '@/services/user.service';
 
-const whatsappService = new WhatsAppService();
 const { META_APP_SECRET, PASSPHRASE } = env;
 
 export class WhatsAppController {
@@ -23,6 +21,7 @@ export class WhatsAppController {
   constructor(fastify: FastifyInstance) {
     this.fastify = fastify;
   }
+
   handleWebhook = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
       const { entry } = req.body as WhatsAppEntry;
@@ -36,47 +35,52 @@ export class WhatsAppController {
         return reply.status(200).send({ status: 'No message data' });
       }
 
-      const messageKey = `whatsapp:msg:${messageData.id}`;
-      try {
-        const isNewMessage = await req.server.redis.set(messageKey, '1', { ttl: 300 });
-        if (isNewMessage === null) {
-          req.log.info(`Duplicate message detected: ${messageData.id}`);
-          return reply.status(200).send({ status: 'Duplicate message ignored' });
-        }
-      } catch (redisError) {
-        console.log(redisError, 'redisError')
-        req.log.error('Redis deduplication failed, proceeding anyway:', redisError);
+      const processingStart = Date.now();
 
-      }
+      const messageKey = `whatsapp:msg:${messageData.id}`;
+      req.server.redis.set(messageKey, '1', { ttl: 300 })
+        .then(isNewMessage => {
+          if (isNewMessage === null) {
+            req.log.info(`Duplicate message detected: ${messageData.id}`);
+          }
+        })
+        .catch(err => req.log.error('Redis deduplication error:', err));
 
       const responseJson = messageData?.interactive?.nfm_reply?.response_json;
-      const flowResponse = responseJson ? JSON.parse(responseJson) : null;
-
-      if (flowResponse && messageData?.from) {
+      if (responseJson && messageData?.from) {
+        const flowResponse = JSON.parse(responseJson);
         const data = TRANSACTION_IS_BEING_VERIFIED({
           to: messageData.from,
           orderReference: flowResponse.order_reference,
         });
-        await whatsappService.sendMessage(data);
+
+        this.fastify.serviceBus.sendMessage('whatsapp-notifications', data)
+          .catch(err => req.log.error('ServiceBus error:', err));
+
         return reply.status(200).send({ status: 'Message processed' });
       }
-
 
       const { from, text } = messageData;
       const messageText = text?.body || 'No text';
       req.log.info(`📩 Received message: "${messageText}" from ${from}`);
 
+      reply.status(200).send({ status: 'Message received' });
 
-      const existingUser = await userService.getUserByIdentifier(from);
-      if (!existingUser) {
-        await userService.createUser(from);
-        req.log.info(`New user created: ${from}`);
-      }
+      Promise.all([
+        userService.getUserByIdentifier(from)
+          .then(existingUser => {
+            if (!existingUser) {
+              return userService.createUser(from)
+                .then(() => req.log.info(`New user created: ${from}`));
+            }
+          })
+          .catch(err => req.log.error('User processing error:', err)),
 
-
-      const data = GET_STARTED(from);
-      await whatsappService.sendMessage(data);
-      return reply.status(200).send({ status: 'Message processed' });
+        this.fastify.serviceBus.sendMessage('whatsapp-notifications', GET_STARTED(from))
+          .catch(err => req.log.error('Message send error:', err))
+      ]).then(() => {
+        req.log.info(`Total processing time: ${Date.now() - processingStart}ms`);
+      });
 
     } catch (error) {
       req.log.error('Error processing WhatsApp webhook:', error);

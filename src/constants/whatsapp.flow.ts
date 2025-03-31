@@ -293,3 +293,27 @@ Reply HELP or reach us via:
 Thank you for choosing Energiease! 🚀`,
   },
 });
+
+export const PAYMENT_RECEIVED = ({
+  to,
+  amount,
+  orderReference,
+}: Omit<ElectricityPurchaseConfirmationParams, 'token' | 'unit' | 'meterNumber' | 'disco'>) => ({
+  messaging_product: 'whatsapp',
+  to,
+  type: 'text',
+  text: {
+    body: `⚡ *Payment Confirmed!* ⚡
+
+✅ Your payment of *₦${amount.toLocaleString()}* was successful!
+
+We're preparing your electricity token and will send it to you shortly.
+
+📌 *Reference:* ${orderReference}
+
+Thank you for choosing Energiease! 
+
+Need help? Reply to this message or contact us:
+📞 07067307317`,
+  },
+});

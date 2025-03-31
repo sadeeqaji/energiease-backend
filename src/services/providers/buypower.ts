@@ -42,7 +42,6 @@ export class BuyPowerProvider implements BillProvider {
             };
 
         } catch (error) {
-            console.log(error)
             this.handleVendError(error);
         }
     }

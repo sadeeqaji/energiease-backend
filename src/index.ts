@@ -10,6 +10,9 @@ import { corsOptions } from './constants/cor';
 import { env } from './config';
 import redisPlugin from './plugins/redis.plugin';
 import serviceBusPlugin from './plugins/serviceBus.plugin';
+import consumerPlugin from './plugins/consumer.plugin';
+import { NotificationService } from './services/notification.service';
+import servicesPlugin from './plugins/services.plugin';
 
 const fastify = Fastify({
   logger: {
@@ -37,9 +40,10 @@ fastify.register(fastifyRawBody, {
 fastify.setErrorHandler(errorHandler);
 fastify.register(successResponsePlugin);
 fastify.register(cors, corsOptions);
-
-fastify.register(serviceBusPlugin);
 fastify.register(redisPlugin);
+fastify.register(serviceBusPlugin);
+fastify.register(consumerPlugin);
+fastify.register(servicesPlugin)
 fastify.register(import('@fastify/sensible'));
 fastify.register(swaggerPlugin);
 fastify.register(authenticationPlugin);

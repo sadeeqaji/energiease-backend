@@ -17,6 +17,7 @@ const env = cleanEnv(process.env, {
   MONNIFY_CLIENT_SECRET: str(),
   MONNIFY_CONTRACT_CODE: str(),
   MONNIFY_TIMEOUT: str(),
+  MONNIFY_BASE_URL: str(),
   PAYSTACK_SECRET_KEY: str(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: str(),
   KEY_VAULT_URL: str(),
@@ -27,7 +28,8 @@ const env = cleanEnv(process.env, {
   FLOW_ID: str(),
   REDIS_CONNECTION_STRING: str(),
   REDIS_ACCESS_KEY: str(),
-  SERVICE_BUS_CONNECTION_STRING: str()
+  SERVICE_BUS_CONNECTION_STRING: str(),
+  SLACK_WEBHOOK_URL: str()
 });
 
 export default env;

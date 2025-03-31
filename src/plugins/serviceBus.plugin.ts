@@ -9,6 +9,7 @@ declare module 'fastify' {
 
 export default fp(async (fastify) => {
     const serviceBusService = new ServiceBusService(fastify);
+
     fastify.decorate('serviceBus', serviceBusService);
 
     fastify.addHook('onClose', async () => {

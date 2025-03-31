@@ -21,6 +21,7 @@ declare module 'fastify' {
             incr: (key: string) => Promise<number>;
 
             disconnect: () => Promise<void>;
+            zAdd: (key: string, score: number, value: string) => Promise<number>;
             isConnected: () => boolean;
         };
     }
@@ -41,14 +42,13 @@ export default fp(async (fastify) => {
         pingInterval: isProduction ? 15000 : 30000
     };
 
-    console.log(redisConfig, 'redisConfig')
 
     const client: RedisClientType = createClient(redisConfig);
 
-    client.on('error', (err) => fastify.log.error(`Redis error: ${err}`));
-    client.on('connect', () => fastify.log.info('Connecting to Redis...'));
+    client.on('error', (err) => fastify.log.error(`❌ Redis error: ${err}`));
+    client.on('connect', () => fastify.log.info('⌛ Connecting to Redis...'));
     client.on('ready', () => fastify.log.info('✅ Redis connected'));
-    client.on('reconnecting', () => fastify.log.warn('Redis reconnecting...'));
+    client.on('reconnecting', () => fastify.log.warn('⌛ Redis reconnecting...'));
     client.on('end', () => fastify.log.warn('Redis connection closed'));
 
     try {
@@ -129,6 +129,15 @@ export default fp(async (fastify) => {
                 await client.quit();
             } catch (err) {
                 fastify.log.error('Redis disconnect error:', err);
+            }
+        },
+
+        zAdd: async (key: string, score: number, value: string) => {
+            try {
+                return await client.zAdd(key, { score, value });
+            } catch (err) {
+                fastify.log.error(`Redis ZADD error for key ${key}:`, err);
+                throw err;
             }
         },
 

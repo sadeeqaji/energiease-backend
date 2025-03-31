@@ -1,6 +1,14 @@
 import { MeterModel } from '@/models/meter.model';
+import { FastifyInstance } from 'fastify';
 
-class MeterService {
+export class MeterService {
+
+    private readonly fastify: FastifyInstance;
+
+    constructor(fastify: FastifyInstance) {
+        this.fastify = fastify;
+
+    }
     async getMeter({ id, meterNumber, userId, phoneNumber }: {
         id?: string;
         meterNumber?: string;
@@ -45,4 +53,4 @@ class MeterService {
     }
 }
 
-export default new MeterService();
+// export default new MeterService();

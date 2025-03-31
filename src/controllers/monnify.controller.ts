@@ -3,8 +3,9 @@ import { MonnifyConfig } from '@/config/monnify.config';
 import { AppException } from '@/utils/appException.utils';
 import crypto from 'crypto';
 import { MonnifyEvent, SuccessfulTransactionEvent } from '@/types/monnify.types';
-import orderService from '@/services/order.service';
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
+import { ServiceBusQueues } from '@/constants/serviceBus';
+import { PAYMENT_RECEIVED } from '@/constants/whatsapp.flow';
 
 export class MonnifyWebhookController {
     private readonly MONNIFY_IPS = ['35.242.133.146'];
@@ -72,34 +73,55 @@ export class MonnifyWebhookController {
     }
 
     private async handleSuccessfulTransaction(event: SuccessfulTransactionEvent): Promise<void> {
-        const cacheKey = `${REDIS_PREFIXES.WEBHOOK_EVENT_PREFIX}${event.eventData.paymentReference}`;
+        const paymentReference = event.eventData.paymentReference
+        const amountPaid = event.eventData.amountPaid
 
-        // Check for existing successful processing
-        const cachedResult = await this.fastify.redis.get(cacheKey);
-        if (cachedResult) {
-            this.fastify.log.info(`Skipping already processed transaction: ${event.eventData.paymentReference}`);
-            return;
+        try {
+            let order = await this.fastify.orderService.getOrderByReference(paymentReference);
+            if (!order) {
+                this.fastify.log.error(`Order not found for reference: ${paymentReference}`);
+                return;
+            }
+            this.sendPaymentReceivedNotification(order.customerPhone, amountPaid, paymentReference)
+                .catch(err => {
+                    this.fastify.log.error(`Failed to send WhatsApp notification:`, err);
+                });
+
+            await this.fastify.serviceBus.sendMessage(ServiceBusQueues.PAYMENT_EVENTS, {
+                eventType: 'SUCCESSFUL_TRANSACTION',
+                transactionId: event.eventData.transactionReference,
+                paymentReference: event.eventData.paymentReference,
+                amount: event.eventData.amountPaid,
+                rawEvent: event
+            });
+
+            this.fastify.log.info(`Processed transaction ${paymentReference} for ${order.customerPhone}`);
+        } catch (error) {
+            this.fastify.log.error(`Error processing payment ${paymentReference}:`, error);
         }
 
-        // Process the transaction
-        const vendUnit = await orderService.confirmAndVendOrder(
-            event.eventData.paymentReference,
-            event.eventData.amountPaid
-        );
 
-        // Cache successful processing
-        await this.fastify.redis.set(
-            cacheKey,
-            JSON.stringify({
-                status: 'success',
-                amount: event.eventData.amountPaid,
-                timestamp: new Date().toISOString(),
-                reference: event.eventData.paymentReference
-            }),
-            { ttl: this.EVENT_TTL }
-        );
+
+
+
 
         this.fastify.log.info(`Successfully processed transaction: ${event.eventData.paymentReference}`);
+    }
+
+
+    private async sendPaymentReceivedNotification(
+        phoneNumber: string,
+        amount: number,
+        reference: string
+    ): Promise<void> {
+        const message = PAYMENT_RECEIVED({
+            to: phoneNumber,
+            amount: amount.toString(),
+            orderReference: reference
+        });
+
+        await this.fastify.serviceBus.sendMessage('whatsapp-notifications', message);
+        this.fastify.log.info(`Queued WhatsApp notification for ${phoneNumber}`);
     }
 
     private async handleEvent(event: MonnifyEvent): Promise<void> {

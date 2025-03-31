@@ -1,9 +1,7 @@
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
 import { serviceFee } from '@/constants/serviceFee';
 import buyPowerService from '@/services/buypower.service';
-import meterService from '@/services/meter.service';
-import orderService from '@/services/order.service';
-import paymentService from '@/services/payment.service';
+// import meterService from '@/services/meter.service';
 import { BillType } from '@/types/bill.types';
 import { DecryptedResponse } from '@/types/whatsapp.types';
 import { AppException } from '@/utils/appException.utils';
@@ -69,7 +67,7 @@ async function handleWelcomeScreen(data: any, fastify: FastifyInstance) {
       };
     }
 
-    const savedMeters = await meterService.getMetersByPhoneNumber(data.phone_number);
+    const savedMeters = await fastify.meterService.getMetersByPhoneNumber(data.phone_number);
     const meters = transformedMeters(savedMeters);
 
     if (meters.length === 0) {
@@ -114,7 +112,7 @@ async function handleSavedMeters(data: any, fastify: FastifyInstance) {
     };
   }
 
-  const meterDetails = await meterService.getMeter({ id: data.selected_meter });
+  const meterDetails = await fastify.meterService.getMeter({ id: data.selected_meter });
   if (!meterDetails) {
     return {
       screen: 'SAVED_METERS',
@@ -149,7 +147,6 @@ async function handleSavedMeters(data: any, fastify: FastifyInstance) {
 }
 
 async function handleNewMeter(data: any, fastify: FastifyInstance) {
-  console.log(data, 'data')
 
   if (!data?.meter_no || !data?.disco || !data?.vend_type) {
     throw AppException.BadRequest('Missing required parameters');
@@ -158,7 +155,6 @@ async function handleNewMeter(data: any, fastify: FastifyInstance) {
   // Check for cached meter details first
   const meterCacheKey = `${REDIS_PREFIXES.METER_CACHE_PREFIX}detail:${data.meter_no}:${data.disco}`;
   const cachedMeterDetails = await fastify.redis.get(meterCacheKey);
-  console.log(data, 'data')
   if (cachedMeterDetails) {
     const total_amount = Number(data.amount) + serviceFee
     return {
@@ -275,29 +271,35 @@ async function handleOrderReview(data: any, fastify: FastifyInstance) {
   }
 
   try {
-    const order = await orderService.createOrder({
+    const details = {
+      meterName: data.meter_name,
+      meterNumber: data.meter_no,
+      meterAddress: data.address,
+      disco: data.disco,
+      vendType: data.vend_type,
+    }
+    const order = await fastify.orderService.createOrder({
       amount: data.amount,
       customerPhone: data.phone_number,
-      details: {
-        meterName: data.meter_name,
-        meterNumber: data.meter_no,
-        meterAddress: data.address,
-        disco: data.disco,
-        vendType: data.vend_type,
-      },
+      details,
       type: BillType.ELECTRICITY
     });
 
 
     if (order.reference && order._id) {
-      const { provider, paymentUrl, bankTransferDetails } = await paymentService.initializePayment(order);
+      const { provider, paymentUrl, bankTransferDetails } = await fastify.paymentService.initializePayment(order);
       await fastify.redis.set(
         `${REDIS_PREFIXES.PAYMENT_CACHE_PREFIX}${order.reference}`,
-        JSON.stringify(bankTransferDetails),
+        JSON.stringify({
+          ...bankTransferDetails,
+          customerPhone: order.customerPhone,
+          amount: order.amount,
+          details
+        }),
         { ttl: 1800 }
       );
       const total_amount = Number(data.amount) + serviceFee
-
+      console.log(paymentUrl, 'paymentUrl')
       return {
         screen: 'PAYMENT',
         data: {

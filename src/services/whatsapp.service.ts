@@ -35,7 +35,6 @@ export class WhatsAppService {
       );
       return response.data;
     } catch (error: unknown) {
-      console.log(error, 'yoo');
       this.handleError(error);
     }
   }

@@ -1,12 +1,19 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { PaystackConfig } from '@/config/paystack.config';
 import { AppException } from '@/utils/appException.utils';
 import crypto from 'crypto';
 import { PaystackEvent, SuccessfulChargeEvent } from '@/types/paystack.types';
-import orderService from '@/services/order.service';
+import { ServiceBusQueues } from '@/constants/serviceBus';
+import { REDIS_PREFIXES } from '@/constants/redisPrefix';
+import { PAYMENT_RECEIVED } from '@/constants/whatsapp.flow';
 
 export class PaystackWebhookController {
     private processedEvents = new Set<string>();
+    private readonly fastify: FastifyInstance;
+
+    constructor(fastify: FastifyInstance) {
+        this.fastify = fastify;
+    }
 
     private validateSignature(request: FastifyRequest, rawBody: string | Buffer): boolean {
         const signature = request.headers['x-paystack-signature'] as string;
@@ -50,8 +57,45 @@ export class PaystackWebhookController {
         const amountPaid = event.data.amount / 100;
         const paymentReference = event?.data?.metadata?.reference || event.data.reference;
 
-        const vendUnit = await orderService.confirmAndVendOrder(paymentReference, amountPaid);
-        console.log('vendUnit', vendUnit);
+        try {
+            let order = await this.fastify.orderService.getOrderByReference(paymentReference);
+            if (!order) {
+                this.fastify.log.error(`Order not found for reference: ${paymentReference}`);
+                return;
+            }
+            this.sendPaymentReceivedNotification(order.customerPhone, amountPaid, paymentReference)
+                .catch(err => {
+                    this.fastify.log.error(`Failed to send WhatsApp notification:`, err);
+                });
+
+            await this.fastify.serviceBus.sendMessage(ServiceBusQueues.PAYMENT_EVENTS, {
+                eventType: 'SUCCESSFUL_TRANSACTION',
+                transactionId: event.data.reference,
+                paymentReference,
+                amount: amountPaid,
+                rawEvent: event,
+                customerPhone: order.customerPhone
+            });
+
+            this.fastify.log.info(`Processed transaction ${paymentReference} for ${order.customerPhone}`);
+        } catch (error) {
+            this.fastify.log.error(`Error processing payment ${paymentReference}:`, error);
+        }
+    }
+
+    private async sendPaymentReceivedNotification(
+        phoneNumber: string,
+        amount: number,
+        reference: string
+    ): Promise<void> {
+        const message = PAYMENT_RECEIVED({
+            to: phoneNumber,
+            amount: amount.toString(),
+            orderReference: reference
+        });
+
+        await this.fastify.serviceBus.sendMessage('whatsapp-notifications', message);
+        this.fastify.log.info(`Queued WhatsApp notification for ${phoneNumber}`);
     }
 
     public async webhookHandler(

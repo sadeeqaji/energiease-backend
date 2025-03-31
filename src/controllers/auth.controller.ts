@@ -36,7 +36,6 @@ export class AuthController {
       );
       reply.status(200).send({ accessToken, refreshToken });
     } catch (error) {
-      console.log(error, 'error')
       reply.status(400).send({ error: (error as Error).message });
     }
   }

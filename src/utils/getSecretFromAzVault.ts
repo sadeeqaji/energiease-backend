@@ -24,7 +24,6 @@ export async function getSecret(): Promise<string | undefined> {
         const secret = await client.getSecret(secretName);
         return secret.value;
     } catch (error) {
-        console.log("Error fetching secret:", error);
         throw error;
     }
 }
