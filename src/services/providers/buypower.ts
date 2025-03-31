@@ -73,7 +73,7 @@ export class BuyPowerProvider implements BillProvider {
             throw AppException.BadRequest(`Missing fields: ${missing.join(', ')}`);
         }
 
-        if (!/^\d{10,12}$/.test(details.meterNumber)) {
+        if (!/^\d{10,13}$/.test(details.meterNumber)) {
             throw AppException.BadRequest('Invalid meter number format');
         }
 
