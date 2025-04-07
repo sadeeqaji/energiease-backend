@@ -530,7 +530,7 @@ async function handleSetupDirectDebit(data: any, fastify: FastifyInstance) {
           );
           return await prepareDirectDebitResponse(data, fastify, activeMandate.mandateReference);
         }
-        return await prepareDirectDebitResponse(data, fastify, activeMandate?.mandateReference);
+        // return await prepareDirectDebitResponse(data, fastify, activeMandate?.mandateReference);
       }
 
       const lockKey = `${REDIS_PREFIXES.DIRECT_DEBIT_ACCOUNT_LOCK}${data.bank}:${data.account_no}`;
