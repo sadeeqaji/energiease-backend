@@ -11,7 +11,6 @@ import { env } from '@/config';
 import { GET_STARTED, TRANSACTION_IS_BEING_VERIFIED } from '@/constants/whatsapp.flow';
 import { handleEnterMeter } from '@/flow-handler';
 import { getSecret } from '@/utils/getSecretFromAzVault';
-import userService from '@/services/user.service';
 
 const { META_APP_SECRET, PASSPHRASE } = env;
 
@@ -67,10 +66,10 @@ export class WhatsAppController {
       reply.status(200).send({ status: 'Message received' });
 
       Promise.all([
-        userService.getUserByIdentifier(from)
+        this.fastify.userService.getUserByIdentifier(from)
           .then(existingUser => {
             if (!existingUser) {
-              return userService.createUser(from)
+              return this.fastify.userService.createUser(from)
                 .then(() => req.log.info(`New user created: ${from}`));
             }
           })

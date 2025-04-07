@@ -5,13 +5,20 @@ import { MeterService } from '@/services/meter.service';
 import { NotificationService } from '@/services/notification.service';
 import { BuyPowerProvider } from '@/services/providers/buypower';
 import { PaymentService } from '@/services/payment.service';
+import { MonnifyService } from '@/services/monnify.service';
+import { PaystackService } from '@/services/paystack.service';
+import { UserService } from '@/services/user.service';
 
 declare module 'fastify' {
     interface FastifyInstance {
+        userService: UserService;
         orderService: OrderService;
         meterService: MeterService;
         notificationService: NotificationService;
         paymentService: PaymentService;
+        monnifyService: MonnifyService
+        paystackService: PaystackService
+
     }
 }
 
@@ -20,9 +27,12 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
     const providers = [new BuyPowerProvider()].sort((a, b) => a.priority - b.priority);
 
     // Initialize services with dependencies
+    const userService = new UserService();
     const notificationService = new NotificationService();
     const meterService = new MeterService(fastify);
     const paymentService = new PaymentService(fastify);
+    const monnifyService = new MonnifyService(fastify)
+    const paystackService = new PaystackService(fastify);
 
     const orderService = new OrderService(
         fastify,
@@ -30,10 +40,13 @@ const servicesPlugin: FastifyPluginAsync = async (fastify) => {
         notificationService,
     );
 
+    fastify.decorate('userService', userService);
     fastify.decorate('orderService', orderService);
     fastify.decorate('meterService', meterService);
     fastify.decorate('notificationService', notificationService);
     fastify.decorate('paymentService', paymentService);
+    fastify.decorate('monnifyService', monnifyService);
+    fastify.decorate('paystackService', paystackService);
 
     fastify.log.info('Services plugin registered');
 };

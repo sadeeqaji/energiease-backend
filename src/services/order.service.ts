@@ -225,7 +225,7 @@ export class OrderService {
      */
     async getOrderByReference(reference: string): Promise<Order | null> {
         // 1. Try Redis cache first
-        const cacheKey = `${REDIS_PREFIXES.PAYMENT_CACHE_PREFIX}${reference}`;
+        const cacheKey = `${REDIS_PREFIXES.PAYMENT_CACHE}${reference}`;
         const cachedData = await this.fastify.redis.get(cacheKey);
 
         if (cachedData) {

@@ -1,5 +1,5 @@
-import monnifyService, { MonnifyService } from './monnify.service';
-import paystackService, { PaystackService } from './paystack.service';
+import { MonnifyService } from './monnify.service';
+import { PaystackService } from './paystack.service';
 import { MonnifyInitTransactionPayload } from '@/types/monnify.types';
 import { PaystackInitTransactionPayload } from '@/types/paystack.types';
 import { transformBankDetails } from '@/utils/payment';
@@ -13,8 +13,8 @@ export class PaymentService {
 
     constructor(fastify: FastifyInstance) {
         this.paymentProviders = [
-            { name: 'Monnify' as PaymentProviders, service: new MonnifyService(), priority: 2 },
-            { name: 'Paystack' as PaymentProviders, service: new PaystackService(), priority: 1 },
+            { name: 'Monnify' as PaymentProviders, service: fastify.monnifyService, priority: 1 },
+            { name: 'Paystack' as PaymentProviders, service: fastify.paystackService, priority: 2 },
         ].sort((a, b) => a.priority - b.priority);
         this.fastify = fastify;
 
@@ -41,9 +41,9 @@ export class PaymentService {
                         customerEmail: 'developer@mindcolony.tech',
                         paymentReference: order.reference,
                     };
-                    paymentResponse = await monnifyService.initializeTransaction(payload)
+                    paymentResponse = await this.fastify.monnifyService.initializeTransaction(payload)
                     if (paymentResponse.transactionReference) {
-                        const generateBankResponse = await monnifyService.generateBankTransfer(
+                        const generateBankResponse = await this.fastify.monnifyService.generateBankTransfer(
                             { transactionReference: paymentResponse.transactionReference }
                         )
                         bankTransferDetails = transformBankDetails('Monnify', generateBankResponse)
@@ -59,8 +59,8 @@ export class PaymentService {
                             reference: order.reference,
                         }
                     };
-                    paymentResponse = await paystackService.initializeTransaction(payload);
-                    const generateBankResponse = await paystackService.generateBankTransfer(
+                    paymentResponse = await this.fastify.paystackService.initializeTransaction(payload);
+                    const generateBankResponse = await this.fastify.paystackService.generateBankTransfer(
                         {
                             amount,
                             email: 'accounting@mindcolony.tech',
@@ -87,4 +87,3 @@ export class PaymentService {
     }
 }
 
-// export default new PaymentService();

@@ -7,8 +7,15 @@ import {
     CardChargePayload
 } from '@/types/paystack.types';
 import { expiresIn30Minutes } from '@/utils/time';
+import { FastifyInstance } from 'fastify';
 
 export class PaystackService {
+    private readonly fastify: FastifyInstance;
+
+    constructor(fastify: FastifyInstance) {
+        this.fastify = fastify;
+
+    }
     private async _request(method: 'POST' | 'GET', endpoint: string, data?: any) {
         try {
             return await axios({
@@ -71,4 +78,3 @@ export class PaystackService {
     }
 }
 
-export default new PaystackService();

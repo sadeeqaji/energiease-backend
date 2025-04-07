@@ -33,7 +33,7 @@ export class MonnifyWebhookController {
     }
 
     private async isWhitelistedIp(ip: string): Promise<boolean> {
-        const key = `${REDIS_PREFIXES.IP_WHITELIST_PREFIX}monnify`;
+        const key = `${REDIS_PREFIXES.IP_WHITELIST}monnify`;
 
         // Try to get from cache first
         const cachedIps = await this.fastify.redis.get(key);
@@ -52,17 +52,17 @@ export class MonnifyWebhookController {
     }
 
     private async isEventProcessed(transactionId: string): Promise<boolean> {
-        const key = `${REDIS_PREFIXES.WEBHOOK_PREFIX}${transactionId}`;
+        const key = `${REDIS_PREFIXES.WEBHOOK}${transactionId}`;
         return await this.fastify.redis.exists(key) === true;
     }
 
     private async markEventAsProcessed(transactionId: string): Promise<void> {
-        const key = `${REDIS_PREFIXES.WEBHOOK_PREFIX}${transactionId}`;
+        const key = `${REDIS_PREFIXES.WEBHOOK}${transactionId}`;
         await this.fastify.redis.set(key, '1', { ttl: this.EVENT_TTL });
     }
 
     private async checkRequestRate(ip: string): Promise<boolean> {
-        const rateLimitKey = `${REDIS_PREFIXES.RATE_LIMIT_PREFIX}${ip}`;
+        const rateLimitKey = `${REDIS_PREFIXES.RATE_LIMIT}${ip}`;
         const currentCount = await this.fastify.redis.incr(rateLimitKey);
 
         if (currentCount === 1) {
@@ -125,6 +125,7 @@ export class MonnifyWebhookController {
     }
 
     private async handleEvent(event: MonnifyEvent): Promise<void> {
+        console.log(event, 'event received');
         switch (event.eventType) {
             case 'SUCCESSFUL_TRANSACTION': {
                 const transactionId = event.eventData.transactionReference;
@@ -143,6 +144,25 @@ export class MonnifyWebhookController {
                 }
                 break;
             }
+            case 'MANDATE_UPDATE': {
+                await this.fastify.userService.update(
+                    { 'mandates.mandateReference': event.eventData.externalMandateReference },
+                    {
+                        $set: {
+                            'mandates.$[elem].status': event.eventData.mandateStatus.toLowerCase(),
+                            'mandates.$[elem].expiryDate': new Date(event.eventData.endDate),
+                            'mandates.$[elem].updatedAt': new Date()
+                        }
+                    },
+                    {
+                        arrayFilters: [{ 'elem.mandateCode': event.eventData.mandateCode }],
+                        returnDocument: 'after'
+                    } as any
+                );
+
+
+            }
+
             default:
                 this.fastify.log.warn(`Unhandled event type received: ${event.eventType}`);
         }

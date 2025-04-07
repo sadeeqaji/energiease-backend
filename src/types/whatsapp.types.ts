@@ -42,6 +42,7 @@ export interface DecryptedResponse {
     selected_action: 'SAVED_METERS' | 'ENTER_METER_NO',
     selected_meter: string;
     order_reference: string;
+    mandate_code: string;
   };
   flow_token: string;
   screen: string;
