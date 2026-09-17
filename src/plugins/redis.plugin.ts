@@ -31,15 +31,20 @@ export default fp(async (fastify) => {
     const redisUrl = env.REDIS_CONNECTION_STRING || process.env.REDIS_URL || 'redis://localhost:6379';
     const isTls = redisUrl.startsWith('rediss://');
 
-    const redisConfig = {
+    const redisConfig: any = {
         url: redisUrl,
-        ...(isTls ? {
-            socket: {
-                tls: true,
-                rejectUnauthorized: false
-            }
-        } : {})
+        socket: {
+            tls: isTls,
+            rejectUnauthorized: false,
+            connectTimeout: 10000,
+            reconnectStrategy: (retries: number) => Math.min(retries * 100, 3000),
+        },
+        pingInterval: 30000, // Keeps connection alive on serverless providers like Upstash
     };
+
+    if (env.REDIS_ACCESS_KEY) {
+        redisConfig.password = env.REDIS_ACCESS_KEY;
+    }
 
 
     const client: RedisClientType = createClient(redisConfig);

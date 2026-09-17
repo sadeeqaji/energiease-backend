@@ -5,12 +5,12 @@ import { env } from '@/config';
 
 async function dbConnectorPlugin(fastify: FastifyInstance) {
   try {
+    const poolSize = Number(process.env.MONGODB_MAX_POOL_SIZE || 50);
     await mongoose.connect(env.MONGODB_URI!, {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: poolSize,
+      minPoolSize: 5,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      family: 4,
-      tlsAllowInvalidCertificates: true,
     });
 
     fastify.decorate('mongoose', mongoose);
