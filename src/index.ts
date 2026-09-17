@@ -11,7 +11,6 @@ import { env } from './config';
 import redisPlugin from './plugins/redis.plugin';
 import serviceBusPlugin from './plugins/serviceBus.plugin';
 import consumerPlugin from './plugins/consumer.plugin';
-import { NotificationService } from './services/notification.service';
 import servicesPlugin from './plugins/services.plugin';
 
 const fastify = Fastify({

@@ -28,18 +28,17 @@ declare module 'fastify' {
 }
 
 export default fp(async (fastify) => {
-    const isProduction = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
+    const redisUrl = env.REDIS_CONNECTION_STRING || process.env.REDIS_URL || 'redis://localhost:6379';
+    const isTls = redisUrl.startsWith('rediss://');
+
     const redisConfig = {
-        url: isProduction ? env.AZURE_REDIS_CONNECTIONSTRING : env.REDIS_CONNECTION_STRING,
-        socket: {
-            tls: true,
-            connectTimeout: isProduction ? 15000 : 5000,
-            servername: 'redis-energiease-prod-weu.redis.cache.windows.net',
-            reconnectStrategy: (retries: number) =>
-                Math.min(retries * (isProduction ? 200 : 100), isProduction ? 10000 : 5000)
-        },
-        password: env.REDIS_ACCESS_KEY,
-        pingInterval: isProduction ? 15000 : 30000
+        url: redisUrl,
+        ...(isTls ? {
+            socket: {
+                tls: true,
+                rejectUnauthorized: false
+            }
+        } : {})
     };
 
 

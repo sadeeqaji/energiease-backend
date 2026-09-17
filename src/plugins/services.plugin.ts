@@ -16,9 +16,9 @@ declare module 'fastify' {
         meterService: MeterService;
         notificationService: NotificationService;
         paymentService: PaymentService;
-        monnifyService: MonnifyService
-        paystackService: PaystackService
-
+        monnifyService: MonnifyService;
+        paystackService: PaystackService;
+        discoHealthService?: any;
     }
 }
 

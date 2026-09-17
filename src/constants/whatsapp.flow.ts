@@ -20,6 +20,7 @@ export const KYC_FLOW_MESSAGE = (to: string) => ({
     action: {
       name: 'flow',
       parameters: {
+        mode: env.FLOW_MODE || 'draft',
         flow_id: '2954602864703606',
         flow_message_version: '3',
         flow_token: 'kyc',
@@ -92,6 +93,7 @@ export const GET_STARTED = (to: string) => ({
     action: {
       name: 'flow',
       parameters: {
+        mode: env.FLOW_MODE || 'draft',
         flow_id: env.FLOW_ID,
         flow_message_version: '3',
         flow_token: 'menu',
@@ -261,6 +263,15 @@ export const expectedEmptyResponse = {
 };
 
 
+export const formatTokenForCopy = (rawToken: string | undefined): string => {
+  if (!rawToken) return 'PENDING_GENERATION';
+  const clean = rawToken.replace(/\D/g, '');
+  if (clean.length === 20) {
+    return clean.match(/.{1,4}/g)?.join('-') || rawToken;
+  }
+  return rawToken;
+};
+
 export const ELECTRICITY_PURCHASE_CONFIRMATION = ({
   to,
   amount,
@@ -269,28 +280,56 @@ export const ELECTRICITY_PURCHASE_CONFIRMATION = ({
   token,
   unit,
   orderReference,
-}: ElectricityPurchaseConfirmationParams) => ({
+}: ElectricityPurchaseConfirmationParams) => {
+  const formattedToken = formatTokenForCopy(token);
+  return {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'text',
+    text: {
+      body: `🎉 *ELECTRICITY TOKEN READY!* ⚡
+
+Tap the token below to copy with 1 tap:
+\`\`\`
+${formattedToken}
+\`\`\`
+
+━━━━━━━━━━━━━━━━━━━━━
+👤 *Meter:* ${meterNumber} (${disco})
+⚡ *Units:* ${unit || 'N/A'} kWh
+💰 *Amount Paid:* ₦${!isNaN(Number(amount)) ? Number(amount).toLocaleString() : amount}
+🧾 *Order Ref:* ${orderReference}
+━━━━━━━━━━━━━━━━━━━━━
+
+💡 *How to load your token:*
+1. Key in the 20 digits above on your meter UI.
+2. Press the blue or enter button.
+3. Your units will update immediately!
+
+Need help? Reply *HELP* or call 📞 07067307317
+Thank you for using Energiease! 🚀`,
+    },
+  };
+};
+
+export const DISCO_RESTORED_NOTIFICATION = ({
+  to,
+  discoName,
+  discoCode,
+}: {
+  to: string;
+  discoName: string;
+  discoCode: string;
+}) => ({
   messaging_product: 'whatsapp',
   to,
   type: 'text',
   text: {
-    body: `ELECTRICITY PURCHASE CONFIRMED! ⚡
-Your payment of ₦${amount} for electricity was successful!💡
-——————————————
-🔌 TRANSACTION DETAILS  
-→ Token: ${token}  
-→ Number of Units: ${unit}  
-→ Amount Paid: ₦${amount}  
-→ Meter Number: ${meterNumber}  
-→ Disco: ${disco}  
-→ Transaction ID: ${orderReference}  
-——————————————
-📲 NEED HELP?  
-Reply HELP or reach us via:  
-📞 +2347067307317  
-📩 support@energiease.ng  
+    body: `🟢 *Good News!* ⚡
 
-Thank you for choosing Energiease! 🚀`,
+*${discoName}* vending servers are now back online and running smoothly.
+
+You can now purchase your electricity token without delays. Tap the button below to buy now!`,
   },
 });
 

@@ -106,6 +106,20 @@ export class ServiceBusService {
             timeToLive?: number;
         }
     ): Promise<void> {
+        if (!this.isInitialized || !this.client) {
+            this.fastify.log.warn(`Service Bus not initialized, skipping queue ${queueName}`);
+            if (queueName === 'whatsapp-notifications') {
+                try {
+                    const { WhatsAppService } = await import('@/services/whatsapp.service');
+                    const whatsappService = new WhatsAppService();
+                    await whatsappService.sendMessage(message as Record<string, unknown>);
+                } catch (fallbackErr: any) {
+                    this.fastify.log.error('Direct WhatsApp fallback error:', fallbackErr.message);
+                }
+            }
+            return;
+        }
+
         const sender = await this.getSender(queueName);
 
         try {
@@ -124,6 +138,17 @@ export class ServiceBusService {
             }
         } catch (error: any) {
             this.fastify.log.error(`Failed to send message to ${queueName}:`, this.safeStringifyError(error));
+            if (queueName === 'whatsapp-notifications') {
+                try {
+                    const { WhatsAppService } = await import('@/services/whatsapp.service');
+                    const whatsappService = new WhatsAppService();
+                    this.fastify.log.info('Fallback: Sending WhatsApp message directly via Cloud API...');
+                    await whatsappService.sendMessage(message as Record<string, unknown>);
+                    return;
+                } catch (fallbackErr: any) {
+                    this.fastify.log.error('Direct WhatsApp fallback error:', fallbackErr.message);
+                }
+            }
             throw AppException.InternalServerError(`Failed to send message: ${error.message}`);
         }
     }
@@ -171,6 +196,16 @@ export class ServiceBusService {
             },
             // Update the processError handler in startConsumer:
             processError: async (args: ProcessErrorArgs) => {
+                if (env.NODE_ENV === 'development') {
+                    const now = Date.now();
+                    const lastLog = (this as any)[`lastErr_${queueName}`] || 0;
+                    if (now - lastLog > 60000) {
+                        (this as any)[`lastErr_${queueName}`] = now;
+                        this.fastify.log.warn(`Service Bus queue "${queueName}" unavailable in local dev: ${args.error.message || 'Connection error'} (suppressing repeats)`);
+                    }
+                    return;
+                }
+
                 this.fastify.log.error(
                     `Error in queue ${queueName}:`,
                     this.safeStringifyError(args.error)
@@ -178,6 +213,7 @@ export class ServiceBusService {
 
                 if (isServiceBusError(args.error)) {
                     this.receivers.delete(queueName);
+                    await new Promise(resolve => setTimeout(resolve, 30000));
                     await this.startConsumer(queueName, handler, options);
                 }
             }

@@ -2,7 +2,7 @@ import { cleanEnv, str, num } from 'envalid';
 
 const env = cleanEnv(process.env, {
   MONGODB_URI: str(),
-  HOST: str(),
+  HOST: str({ default: '0.0.0.0' }),
   PORT: num({ default: 5000 }),
   NODE_ENV: str({ choices: ['development', 'production', 'staging'] }),
   META_ACCESS_TOKEN: str(),
@@ -19,17 +19,13 @@ const env = cleanEnv(process.env, {
   MONNIFY_TIMEOUT: str(),
   MONNIFY_BASE_URL: str(),
   PAYSTACK_SECRET_KEY: str(),
-  APPLICATIONINSIGHTS_CONNECTION_STRING: str(),
-  KEY_VAULT_URL: str(),
-  AZURE_REDIS_CONNECTIONSTRING: str({ default: undefined }),
-  AZURE_TENANT_ID: str({ default: undefined }),
-  AZURE_CLIENT_ID: str({ default: undefined }),
-  AZURE_CLIENT_SECRET: str({ default: undefined }),
+  KEY_VAULT_URL: str({ default: undefined }),
   FLOW_ID: str(),
-  REDIS_CONNECTION_STRING: str(),
-  REDIS_ACCESS_KEY: str(),
-  SERVICE_BUS_CONNECTION_STRING: str(),
-  SLACK_WEBHOOK_URL: str()
+  FLOW_MODE: str({ default: 'draft' }),
+  REDIS_CONNECTION_STRING: str({ default: undefined }),
+  REDIS_ACCESS_KEY: str({ default: undefined }),
+  SERVICE_BUS_CONNECTION_STRING: str({ default: undefined }),
+  SLACK_WEBHOOK_URL: str({ default: undefined })
 });
 
 export default env;

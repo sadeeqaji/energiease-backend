@@ -21,29 +21,41 @@ interface DecryptRequestResult {
 
 export const decryptRequest = (
   body: DecryptRequestBody,
-  privatePem: string,
+  privatePem: string | string[],
   passphrase: string,
 ): DecryptRequestResult => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-  const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
+  const candidatePems = Array.isArray(privatePem) ? privatePem : [privatePem];
   let decryptedAesKey: Buffer | null = null;
-  try {
-    // decrypt AES key created by client
-    decryptedAesKey = crypto.privateDecrypt(
-      {
-        key: privateKey,
-        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256',
-      },
-      Buffer.from(encrypted_aes_key, 'base64'),
-    );
-  } catch (error) {
-    console.log(error, 'error');
-    /*
-        Failed to decrypt. Please verify your private key.
-        If you change your public key. You need to return HTTP status code 421 to refresh the public key on the client
-        */
+  let lastError: unknown = null;
+
+  for (const pem of candidatePems) {
+    try {
+      let privateKey;
+      try {
+        privateKey = crypto.createPrivateKey({ key: pem, passphrase });
+      } catch {
+        privateKey = crypto.createPrivateKey(pem);
+      }
+      decryptedAesKey = crypto.privateDecrypt(
+        {
+          key: privateKey,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(encrypted_aes_key, 'base64'),
+      );
+      if (decryptedAesKey) {
+        break;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!decryptedAesKey) {
+    console.log(lastError, 'error decrypting AES key');
     throw new FlowEndpointException(
       421,
       'Failed to decrypt the request. Please verify your private key.',

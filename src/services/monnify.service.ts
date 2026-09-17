@@ -363,8 +363,8 @@ export class MonnifyService {
 
             console.log(response, 'response data');
             return {
-                status: response.data.responseBody.status,
-                amount: response.data.responseBody.amount,
+                status: response.data.responseBody.requestSuccessful,
+                amount: response.data.responseBody.debitAmount,
                 transactionReference: response.data.responseBody.transactionReference
             };
         } catch (error: any) {

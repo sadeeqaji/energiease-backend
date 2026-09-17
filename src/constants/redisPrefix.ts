@@ -13,4 +13,5 @@ export const REDIS_PREFIXES = {
     MANDATE: 'mandate:',
     DIRECT_DEBIT_ACCOUNT_LOCK: 'dd_account_lock:',
     DIRECT_DEBIT_MANDATE_CACHE: 'dd_mandate:',
+    DISCO_HEALTH: 'disco_health:',
 };
