@@ -274,12 +274,11 @@ export class WhatsAppController {
           })
           .catch(err => req.log.error('User processing error:', err)),
 
-        this.fastify.serviceBus.sendMessage('whatsapp-notifications', GET_STARTED(from))
+        this.fastify.whatsappService.sendMessage(GET_STARTED(from))
           .catch(async err => {
             req.log.error('Message send error:', err);
             try {
-              const { WhatsAppService } = await import('@/services/whatsapp.service');
-              await new WhatsAppService().sendMessage({
+              await this.fastify.whatsappService.sendMessage({
                 messaging_product: 'whatsapp',
                 recipient_type: 'individual',
                 to: from,

@@ -3,7 +3,6 @@ import { PaystackConfig } from '@/config/paystack.config';
 import { AppException } from '@/utils/appException.utils';
 import crypto from 'crypto';
 import { PaystackEvent, SuccessfulChargeEvent } from '@/types/paystack.types';
-import { ServiceBusQueues } from '@/constants/serviceBus';
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
 import { PAYMENT_RECEIVED } from '@/constants/whatsapp.flow';
 
@@ -69,14 +68,7 @@ export class PaystackWebhookController {
                     this.fastify.log.error(`Failed to send WhatsApp notification:`, err);
                 });
 
-            await this.fastify.serviceBus.sendMessage(ServiceBusQueues.PAYMENT_EVENTS, {
-                eventType: 'SUCCESSFUL_TRANSACTION',
-                transactionId: event.data.reference,
-                paymentReference,
-                amount: amountPaid,
-                rawEvent: event,
-                customerPhone: order.customerPhone
-            });
+            await this.fastify.orderService.confirmAndVendOrder(paymentReference, amountPaid);
 
             this.fastify.log.info(`Processed transaction ${paymentReference} for ${order.customerPhone}`);
         } catch (error) {
@@ -95,8 +87,8 @@ export class PaystackWebhookController {
             orderReference: reference
         });
 
-        await this.fastify.serviceBus.sendMessage('whatsapp-notifications', message);
-        this.fastify.log.info(`Queued WhatsApp notification for ${phoneNumber}`);
+        await this.fastify.whatsappService.sendMessage(message as Record<string, unknown>);
+        this.fastify.log.info(`Sent WhatsApp payment received notification for ${phoneNumber}`);
     }
 
     public async webhookHandler(

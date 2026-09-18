@@ -4,7 +4,6 @@ import { AppException } from '@/utils/appException.utils';
 import crypto from 'crypto';
 import { MonnifyEvent, SuccessfulTransactionEvent } from '@/types/monnify.types';
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
-import { ServiceBusQueues } from '@/constants/serviceBus';
 import { PAYMENT_RECEIVED } from '@/constants/whatsapp.flow';
 
 export class MonnifyWebhookController {
@@ -83,27 +82,15 @@ export class MonnifyWebhookController {
                     this.fastify.log.error(`Failed to send WhatsApp notification:`, err);
                 });
 
-            await this.fastify.serviceBus.sendMessage(ServiceBusQueues.PAYMENT_EVENTS, {
-                eventType: 'SUCCESSFUL_TRANSACTION',
-                transactionId: event.eventData.transactionReference,
-                paymentReference: event.eventData.paymentReference,
-                amount: event.eventData.amountPaid,
-                rawEvent: event
-            });
+            await this.fastify.orderService.confirmAndVendOrder(paymentReference, amountPaid);
 
             this.fastify.log.info(`Processed transaction ${paymentReference} for ${order.customerPhone}`);
         } catch (error) {
             this.fastify.log.error(`Error processing payment ${paymentReference}:`, error);
         }
 
-
-
-
-
-
         this.fastify.log.info(`Successfully processed transaction: ${event.eventData.paymentReference}`);
     }
-
 
     private async sendPaymentReceivedNotification(
         phoneNumber: string,
@@ -116,8 +103,8 @@ export class MonnifyWebhookController {
             orderReference: reference
         });
 
-        await this.fastify.serviceBus.sendMessage('whatsapp-notifications', message);
-        this.fastify.log.info(`Queued WhatsApp notification for ${phoneNumber}`);
+        await this.fastify.whatsappService.sendMessage(message as Record<string, unknown>);
+        this.fastify.log.info(`Sent WhatsApp payment received notification for ${phoneNumber}`);
     }
 
     private async handleEvent(event: MonnifyEvent): Promise<void> {

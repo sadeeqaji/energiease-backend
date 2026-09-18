@@ -23,7 +23,6 @@ const env = cleanEnv(process.env, {
   FLOW_MODE: str({ default: 'published', choices: ['draft', 'published'] }),
   REDIS_CONNECTION_STRING: str({ default: undefined }),
   REDIS_ACCESS_KEY: str({ default: undefined }),
-  SERVICE_BUS_CONNECTION_STRING: str({ default: undefined }),
   SLACK_WEBHOOK_URL: str({ default: undefined }),
   BOT_PHONE_NUMBER: str({ default: '2349139932585' }),
   APP_BASE_URL: str({ default: 'https://krishna-incongruent-interconvertibly.ngrok-free.dev' }),
