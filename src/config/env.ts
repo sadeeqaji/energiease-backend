@@ -28,7 +28,8 @@ const env = cleanEnv(process.env, {
   APP_BASE_URL: str({ default: 'https://krishna-incongruent-interconvertibly.ngrok-free.dev' }),
   TELEGRAM_BOT_TOKEN: str({ default: undefined }),
   TELEGRAM_CHAT_ID: str({ default: undefined }),
-  TELEGRAM_TOPIC_ID: str({ default: undefined })
+  TELEGRAM_TOPIC_ID: str({ default: undefined }),
+  JWT_SECRET: str({ default: 'energiease-jwt-secret-key-change-in-prod' })
 });
 
 export default env;

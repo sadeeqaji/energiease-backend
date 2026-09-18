@@ -6,8 +6,6 @@
     "dev": "tsx watch src/index.ts",
     "seed": "tsx src/seeds/index.ts",
     "build": "tsc && tsc-alias",
-    "generate:keys": "node dist/utils/accessKeyGenerator.js",
-    "generate:keys-dev": "tsx src/utils/accessKeyGenerator.ts",
     "start": "node -r tsconfig-paths/register dist/index.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",

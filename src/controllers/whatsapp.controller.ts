@@ -19,19 +19,7 @@ import { BillType } from '@/types/bill.types';
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
 import { formatToWhatsAppPhone } from '@/utils/phoneNumber';
 
-import fs from 'fs';
-import path from 'path';
-
 const { META_APP_SECRET, PASSPHRASE } = env;
-
-// Preload accessTokenKey once at module startup to eliminate synchronous disk I/O in the flow request loop
-let cachedAccessTokenKey = '';
-try {
-  const keyPath = path.join(process.cwd(), 'keys/accessTokenPrivate.key');
-  if (fs.existsSync(keyPath)) {
-    cachedAccessTokenKey = fs.readFileSync(keyPath, 'utf-8');
-  }
-} catch {}
 
 export class WhatsAppController {
   private readonly fastify: FastifyInstance;
@@ -328,7 +316,6 @@ export class WhatsAppController {
         const PRIVATE_KEY = await getSecret();
         const candidateKeys = [
           PRIVATE_KEY!,
-          cachedAccessTokenKey,
           `-----BEGIN ENCRYPTED PRIVATE KEY-----
 MIIFLTBXBgkqhkiG9w0BBQ0wSjApBgkqhkiG9w0BBQwwHAQI0WRwv1LsoMICAggA
 MAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBCHJy3x35R8d3HWjYPWg9HlBIIE
