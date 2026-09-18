@@ -20,9 +20,10 @@ export class TelegramService {
 
         try {
             const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+            const safeText = htmlMessage.length > 4000 ? htmlMessage.substring(0, 4000) + '...' : htmlMessage;
             const payload: Record<string, any> = {
                 chat_id: this.chatId,
-                text: htmlMessage,
+                text: safeText,
                 parse_mode: 'HTML',
                 disable_web_page_preview: true,
             };

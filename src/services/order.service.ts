@@ -376,13 +376,15 @@ export class OrderService {
                 : '❌ Order vending failed permanently.'
         );
 
+        const electricityDetails = order.details as any;
+        const meterNumber = electricityDetails?.meterNumber || 'your meter';
+        const disco = electricityDetails?.disco || '';
+
         // Notify customer on WhatsApp that payment is safely confirmed and token generation is queued
         if (isWalletOrProviderIssue && order.customerPhone) {
             try {
                 const { WhatsAppService } = await import('@/services/whatsapp.service');
                 const cleanPhone = order.customerPhone.replace(/[^0-9]/g, '');
-                const electricityDetails = order.details as any;
-                const meterNumber = electricityDetails?.meterNumber || 'your meter';
 
                 await new WhatsAppService().sendMessage({
                     messaging_product: 'whatsapp',
@@ -409,6 +411,9 @@ export class OrderService {
             provider: order.provider || 'none',
             metadata: {
                 status,
+                disco,
+                meterNumber,
+                customerPhone: order.customerPhone || 'N/A',
                 requiresManualIntervention: String(isWalletOrProviderIssue),
             }
         });

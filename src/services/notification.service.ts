@@ -1,8 +1,6 @@
-import axios from 'axios';
-import { FastifyInstance } from 'fastify';
-import { AppException } from '@/utils/appException.utils';
+import telegramService from './telegram.service';
 
-type SlackAlert = {
+export type NotificationAlert = {
     title: string;
     fields: { title: string; value: string; short?: boolean }[];
     stack?: string;
@@ -10,35 +8,44 @@ type SlackAlert = {
 };
 
 export class NotificationService {
-    // constructor(private readonly fastify: FastifyInstance) { }
+    private escapeHtml(text: string): string {
+        return (text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
-    async slack(params: SlackAlert) {
-        if (!process.env.SLACK_WEBHOOK_URL) {
-            // this.fastify.log.warn('Slack webhook not configured');
-            return;
-        }
-
+    async sendAlert(params: NotificationAlert): Promise<boolean> {
         try {
-            const color = {
-                critical: '#FF0000',
-                warning: '#FFA500',
-                info: '#36A64F'
+            const severityIcon = {
+                critical: '🚨',
+                warning: '⚠️',
+                info: 'ℹ️',
             }[params.severity || 'critical'];
 
-            await axios.post(process.env.SLACK_WEBHOOK_URL, {
-                attachments: [{
-                    color,
-                    title: params.title,
-                    fields: params.fields.map(f => ({ ...f, short: f.short ?? true })),
-                    text: params.stack ? `\`\`\`${params.stack.substring(0, 1500)}\`\`\`` : '',
-                    footer: `Env: ${process.env.NODE_ENV} | ${new Date().toISOString()}`,
-                    mrkdwn_in: ['text']
-                }]
-            });
-        } catch (error) {
-            // this.fastify.log.error('Slack notification failed:', error);
-            throw AppException.InternalServerError('Notification service unavailable');
+            let message = `${severityIcon} <b>${this.escapeHtml(params.title)}</b>\n\n`;
+
+            for (const field of params.fields) {
+                message += `<b>${this.escapeHtml(field.title)}:</b> ${field.value}\n`;
+            }
+
+            if (params.stack) {
+                const cleanStack = this.escapeHtml(params.stack.substring(0, 800));
+                message += `\n<pre>${cleanStack}</pre>\n`;
+            }
+
+            message += `\n<i>Env: ${process.env.NODE_ENV || 'production'} | ${new Date().toLocaleTimeString('en-GB')}</i>`;
+
+            return await telegramService.sendAlert(message);
+        } catch (error: any) {
+            console.error('[NotificationService] Failed to dispatch Telegram alert:', error?.message);
+            return false;
         }
+    }
+
+    // Alias for backward compatibility
+    async slack(params: NotificationAlert): Promise<boolean> {
+        return this.sendAlert(params);
     }
 
     async vendFailure(params: {
@@ -48,19 +55,27 @@ export class NotificationService {
         provider?: string;
         metadata?: Record<string, string>;
     }) {
-        await this.slack({
-            title: `⚡ Vending Failed (${params.provider || 'Unknown'})`,
+        const disco = params.metadata?.disco || '';
+        const meter = params.metadata?.meterNumber || '';
+
+        await this.sendAlert({
+            title: `Vending Failed (${params.provider || 'Unknown'})`,
             fields: [
-                { title: 'Reference', value: params.reference, short: false },
-                { title: 'Amount', value: params.amount.toString(), short: true },
-                { title: 'Provider', value: params.provider || 'Unknown', short: true },
-                ...Object.entries(params.metadata || {}).map(([k, v]) => ({
-                    title: k, value: v, short: true
-                })),
-                { title: 'Error', value: params.error.message, short: false }
+                { title: 'Reference', value: `<code>${params.reference}</code>` },
+                { title: 'Amount', value: `₦${params.amount.toLocaleString()}` },
+                { title: 'Provider', value: params.provider || 'Unknown' },
+                ...(disco ? [{ title: 'DISCO', value: disco }] : []),
+                ...(meter ? [{ title: 'Meter', value: `<code>${meter}</code>` }] : []),
+                ...Object.entries(params.metadata || {})
+                    .filter(([k]) => !['disco', 'meterNumber'].includes(k))
+                    .map(([k, v]) => ({
+                        title: k,
+                        value: v,
+                    })),
+                { title: 'Error', value: `<code>${this.escapeHtml(params.error.message)}</code>` },
             ],
             stack: params.error.stack,
-            severity: 'critical'
+            severity: 'critical',
         });
     }
 }
