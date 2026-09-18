@@ -13,14 +13,13 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src/**/*.ts",
     "precommit": "eslint .",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@azure/service-bus": "^7.9.5",
     "@fastify/cors": "^11.0.0",
     "@fastify/sensible": "^6.0.3",
     "@fastify/swagger": "^9.4.2",
