@@ -6,6 +6,16 @@ export default async function whatsappRoutes(fastify: FastifyInstance) {
 
   fastify.get('/webhook', whatsappController.verifyWebhook);
   fastify.post('/webhook', whatsappController.handleWebhook);
+  fastify.get('/flow', async () => ({ status: 'active' }));
+  fastify.post(
+    '/flow',
+    {
+      config: {
+        rawBody: true,
+      },
+    },
+    whatsappController.handleFlowWebhook,
+  );
   fastify.post(
     '/flow-webhook',
     {
