@@ -72,19 +72,25 @@ const OrderSchema: Schema<Order> = new Schema({
         unique: true,
         index: true
     },
-    paymentConfirmedAt: Date
+    paymentConfirmedAt: Date,
+    requiresManualIntervention: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    fulfillmentFailureReason: String
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-    index: [
-        { reference: 1 },
-        { user: 1, status: 1 },
-        { provider: 1, status: 1 },
-        { type: 1, status: 1 },
-        { createdAt: -1 }
-    ]
 });
+
+OrderSchema.index({ customerPhone: 1, createdAt: -1 });
+OrderSchema.index({ status: 1, createdAt: -1 });
+OrderSchema.index({ status: 1, requiresManualIntervention: 1 });
+OrderSchema.index({ user: 1, status: 1 });
+OrderSchema.index({ provider: 1, status: 1 });
+OrderSchema.index({ createdAt: -1 });
 
 function validateDetails(billType: BillType, details: BillDetails): boolean {
     switch (billType) {

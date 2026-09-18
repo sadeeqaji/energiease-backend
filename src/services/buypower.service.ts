@@ -74,6 +74,164 @@ export class BuyPowerService {
             throw AppException.InternalServerError('Internal server error');
         }
     }
+
+    async getWalletBalance(): Promise<{ balance: number; commission: number }> {
+        try {
+            const response = await axios.get(`${BuyPowerConfig.baseUrl}/wallet/balance`, {
+                headers: {
+                    Authorization: `Bearer ${BuyPowerConfig.apiKey}`,
+                },
+                timeout: 10000,
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[BuyPower] Failed to fetch wallet balance:', error.response?.data || error.message);
+            throw error;
+        }
+    }
+
+    private reliabilityCache: { data: ReliabilityProvider[]; timestamp: number } | null = null;
+    private readonly RELIABILITY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes in-memory cache
+
+    async getReliabilityIndex(): Promise<ReliabilityProvider[]> {
+        const now = Date.now();
+        if (this.reliabilityCache && now - this.reliabilityCache.timestamp < this.RELIABILITY_CACHE_TTL_MS) {
+            return this.reliabilityCache.data;
+        }
+
+        try {
+            const response = await axios.get(`${BuyPowerConfig.baseUrl}/providers/reliability-index`, {
+                headers: {
+                    Authorization: `Bearer ${BuyPowerConfig.apiKey}`,
+                },
+                timeout: 10000,
+            });
+
+            if (response.data?.status === 'ok' && Array.isArray(response.data?.data)) {
+                this.reliabilityCache = {
+                    data: response.data.data,
+                    timestamp: now,
+                };
+                return response.data.data;
+            }
+            return this.reliabilityCache?.data || [];
+        } catch (error: any) {
+            console.error('[BuyPower] Failed to fetch reliability index:', error.response?.data || error.message);
+            return this.reliabilityCache?.data || [];
+        }
+    }
+
+    async getDiscoReliability(disco: string): Promise<DiscoReliability> {
+        const rawUpper = (disco || '').toUpperCase().trim();
+        const discoCode = DISCO_ALIASES[rawUpper] || rawUpper;
+
+        const allProviders = await this.getReliabilityIndex();
+        const electricityProviders = allProviders.filter(p => p.vertical === 'ELECTRICITY');
+        const provider = electricityProviders.find(p => p.disco_code.toUpperCase() === discoCode);
+
+        // If provider not found in list, treat as online and healthy
+        if (!provider) {
+            return {
+                disco,
+                discoCode,
+                isOnline: true,
+                successPercentage: 100,
+                failurePercentage: 0,
+                isReliable: true,
+                status: 'HEALTHY',
+            };
+        }
+
+        const isOnline = provider.provider_online !== false;
+        const successRate = provider.success_percentage ?? 100;
+        const failureRate = provider.failure_percentage ?? 0;
+
+        if (!isOnline) {
+            return {
+                disco,
+                discoCode,
+                isOnline: false,
+                successPercentage: successRate,
+                failurePercentage: failureRate,
+                isReliable: false,
+                status: 'DOWN',
+                warningMessage: `${disco} is currently offline on the national grid network. You can proceed to pay, and your order will be queued and automatically vended as soon as ${disco} comes back online.`,
+            };
+        }
+
+        if (successRate < 80) {
+            return {
+                disco,
+                discoCode,
+                isOnline: true,
+                successPercentage: successRate,
+                failurePercentage: failureRate,
+                isReliable: false,
+                status: 'DEGRADED',
+                warningMessage: `${disco} is currently experiencing high network delays (${failureRate}% failure rate). If you proceed, your transaction will be queued and retried automatically until successful.`,
+            };
+        }
+
+        return {
+            disco,
+            discoCode,
+            isOnline: true,
+            successPercentage: successRate,
+            failurePercentage: failureRate,
+            isReliable: true,
+            status: 'HEALTHY',
+        };
+    }
 }
 
+export interface ReliabilityProvider {
+    vertical: string;
+    disco_code: string;
+    success_percentage: number | null;
+    pending_percentage: number | null;
+    failure_percentage: number | null;
+    provider_online: boolean;
+}
+
+export interface DiscoReliability {
+    disco: string;
+    discoCode: string;
+    isOnline: boolean;
+    successPercentage: number;
+    failurePercentage: number;
+    isReliable: boolean;
+    status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+    warningMessage?: string;
+}
+
+export const DISCO_ALIASES: Record<string, string> = {
+    PORT_HARCOURT: 'PH',
+    PHED: 'PH',
+    PH: 'PH',
+    AEDC: 'ABUJA',
+    ABUJA: 'ABUJA',
+    EKEDC: 'EKO',
+    EKO: 'EKO',
+    IKEDC: 'IKEJA',
+    IKEJA: 'IKEJA',
+    IBEDC: 'IBADAN',
+    IBADAN: 'IBADAN',
+    KEDCO: 'KANO',
+    KANO: 'KANO',
+    KAEDCO: 'KADUNA',
+    KADUNA: 'KADUNA',
+    JED: 'JOS',
+    JOS: 'JOS',
+    BEDC: 'BENIN',
+    BENIN: 'BENIN',
+    EEDC: 'ENUGU',
+    ENUGU: 'ENUGU',
+    YEDC: 'YOLA',
+    YOLA: 'YOLA',
+    ABA: 'ABAPOWER',
+    ABAPOWER: 'ABAPOWER',
+    APLE: 'APLE',
+};
+
 export default new BuyPowerService();
+

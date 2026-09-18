@@ -1,5 +1,4 @@
 import { FastifyInstance } from "fastify";
-import { isServiceBusError } from "@azure/service-bus";
 // import orderService from "@/services/order.service";
 
 interface PaymentMessage {
@@ -43,7 +42,7 @@ export class PaymentConsumer {
             await this.handlePayment(message);
             await context.complete();
         } catch (error: any) {
-            if (isServiceBusError(error)) {
+            if (error && error.code) {
                 await this.handleServiceBusError(error);
             }
             await this.handleError(message, error, context);

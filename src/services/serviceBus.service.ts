@@ -26,7 +26,7 @@ export class ServiceBusService {
     private client: ServiceBusClient | null = null;
     private senders: Map<string, ServiceBusSender> = new Map();
     private receivers: Map<string, ServiceBusReceiver> = new Map();
-    private isInitialized = false;
+    public isInitialized = false;
 
     constructor(private readonly fastify: FastifyInstance) {
         this.initialize();
@@ -34,7 +34,7 @@ export class ServiceBusService {
 
     private initialize() {
         if (!env.SERVICE_BUS_CONNECTION_STRING) {
-            this.fastify.log.warn('Service Bus connection string not configured');
+            this.fastify.log.info('Service Bus connection string not configured. Service Bus is disabled.');
             return;
         }
 
@@ -49,7 +49,7 @@ export class ServiceBusService {
             this.fastify.log.info('Service Bus client initialized');
         } catch (error) {
             this.fastify.log.error('Failed to initialize Service Bus client:', this.safeStringifyError(error));
-            throw AppException.InternalServerError('Failed to initialize Service Bus');
+            this.isInitialized = false;
         }
     }
 
@@ -107,7 +107,7 @@ export class ServiceBusService {
         }
     ): Promise<void> {
         if (!this.isInitialized || !this.client) {
-            this.fastify.log.warn(`Service Bus not initialized, skipping queue ${queueName}`);
+            this.fastify.log.info(`Service Bus not initialized, skipping queue ${queueName} and running direct handling`);
             if (queueName === 'whatsapp-notifications') {
                 try {
                     const { WhatsAppService } = await import('@/services/whatsapp.service');
@@ -115,6 +115,16 @@ export class ServiceBusService {
                     await whatsappService.sendMessage(message as Record<string, unknown>);
                 } catch (fallbackErr: any) {
                     this.fastify.log.error('Direct WhatsApp fallback error:', fallbackErr.message);
+                }
+            } else if (queueName === 'payment-events') {
+                try {
+                    const payload = message as any;
+                    if (payload.paymentReference && payload.amount) {
+                        this.fastify.log.info(`Direct Payment fallback: Confirming and vending order for ${payload.paymentReference}`);
+                        await this.fastify.orderService.confirmAndVendOrder(payload.paymentReference, payload.amount);
+                    }
+                } catch (fallbackErr: any) {
+                    this.fastify.log.error('Direct Payment fallback error:', fallbackErr.message);
                 }
             }
             return;
@@ -148,6 +158,17 @@ export class ServiceBusService {
                 } catch (fallbackErr: any) {
                     this.fastify.log.error('Direct WhatsApp fallback error:', fallbackErr.message);
                 }
+            } else if (queueName === 'payment-events') {
+                try {
+                    const payload = message as any;
+                    if (payload.paymentReference && payload.amount) {
+                        this.fastify.log.info(`Fallback: Confirming and vending order for ${payload.paymentReference}`);
+                        await this.fastify.orderService.confirmAndVendOrder(payload.paymentReference, payload.amount);
+                        return;
+                    }
+                } catch (fallbackErr: any) {
+                    this.fastify.log.error('Direct Payment fallback error:', fallbackErr.message);
+                }
             }
             throw AppException.InternalServerError(`Failed to send message: ${error.message}`);
         }
@@ -160,7 +181,10 @@ export class ServiceBusService {
             maxConcurrent?: number;
         } = { maxConcurrent: 1 }
     ) {
-        this.assertInitialized();
+        if (!this.isInitialized || !this.client) {
+            this.fastify.log.info(`Service Bus not initialized, skipping consumer for ${queueName}`);
+            return;
+        }
 
         if (this.receivers.has(queueName)) {
             this.fastify.log.warn(`Consumer for ${queueName} already exists`);

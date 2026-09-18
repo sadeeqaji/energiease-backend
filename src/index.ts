@@ -53,6 +53,11 @@ const start = async () => {
   try {
     await fastify.listen({ host: env.HOST, port: env.PORT });
     console.log(`Server running at http://localhost:${env.PORT}`);
+
+    // Start BuyPower 15-minute wallet balance monitor
+    const { WalletMonitor } = await import('./jobs/walletMonitor.job');
+    const walletMonitor = new WalletMonitor(fastify);
+    walletMonitor.start();
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

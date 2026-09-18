@@ -22,6 +22,10 @@ export default fp(async (fastify) => {
 
     fastify.addHook('onReady', async () => {
         if (process.env.NODE_ENV !== 'test') {
+            if (!fastify.serviceBus?.isInitialized) {
+                fastify.log.info('Service Bus disabled or not configured; skipping Service Bus consumers.');
+                return;
+            }
             try {
                 await Promise.all([
                     whatsappConsumer.start(),

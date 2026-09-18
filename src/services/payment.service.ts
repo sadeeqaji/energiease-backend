@@ -6,6 +6,7 @@ import { transformBankDetails } from '@/utils/payment';
 import { BankDetails, PaymentProviders } from '@/types/payment.types';
 import { makeValidURI } from '@/utils/url';
 import { FastifyInstance } from 'fastify';
+import { env } from '@/config';
 
 export class PaymentService {
     private paymentProviders: { name: PaymentProviders; service: MonnifyService | PaystackService; priority: number }[];
@@ -28,6 +29,7 @@ export class PaymentService {
         reference: string;
     }): Promise<{ paymentUrl: string; provider: string, bankTransferDetails: BankDetails }> {
         let lastError: Error | null = null;
+        const redirectUrl = `${env.APP_BASE_URL}/orders/payment-success?ref=${order.reference}`;
 
         for (const provider of this.paymentProviders) {
             try {
@@ -40,6 +42,7 @@ export class PaymentService {
                         customerName: 'Customer',
                         customerEmail: 'developer@mindcolony.tech',
                         paymentReference: order.reference,
+                        redirectUrl,
                     };
                     paymentResponse = await this.fastify.monnifyService.initializeTransaction(payload)
                     if (paymentResponse.transactionReference) {
@@ -55,6 +58,7 @@ export class PaymentService {
                     const payload: PaystackInitTransactionPayload = {
                         amount,
                         email: 'accounting@mindcolony.tech',
+                        callback_url: redirectUrl,
                         metadata: {
                             reference: order.reference,
                         }

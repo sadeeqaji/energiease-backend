@@ -8,8 +8,8 @@ import { REDIS_PREFIXES } from '@/constants/redisPrefix';
 import { PAYMENT_RECEIVED } from '@/constants/whatsapp.flow';
 
 export class PaystackWebhookController {
-    private processedEvents = new Set<string>();
     private readonly fastify: FastifyInstance;
+    private readonly EVENT_TTL = 86400;
 
     constructor(fastify: FastifyInstance) {
         this.fastify = fastify;
@@ -36,20 +36,21 @@ export class PaystackWebhookController {
         return paystackIps.includes(ip);
     }
 
-    private handleEvent(event: PaystackEvent): void {
+    private async handleEvent(event: PaystackEvent): Promise<void> {
         switch (event.event) {
             case 'charge.success': {
                 const transactionReference = event.data.reference;
-                if (this.processedEvents.has(transactionReference)) {
-                    console.log('Duplicate transaction:', transactionReference);
+                const lockKey = `${REDIS_PREFIXES.WEBHOOK}paystack:${transactionReference}`;
+                const isNew = await this.fastify.redis.set(lockKey, '1', { ttl: this.EVENT_TTL, nx: true });
+                if (!isNew) {
+                    this.fastify.log.info(`Duplicate Paystack transaction skipped: ${transactionReference}`);
                     return;
                 }
-                this.handleSuccessfulCharge(event as SuccessfulChargeEvent);
-                this.processedEvents.add(transactionReference);
+                await this.handleSuccessfulCharge(event as SuccessfulChargeEvent);
                 break;
             }
             default:
-                console.warn('Unhandled event type:', event.event);
+                this.fastify.log.warn(`Unhandled Paystack event type: ${event.event}`);
         }
     }
 

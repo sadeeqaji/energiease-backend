@@ -15,6 +15,8 @@ export interface Order extends Document {
     providerOrderId?: string;
     reference: string;
     paymentConfirmedAt?: Date;
+    requiresManualIntervention?: boolean;
+    fulfillmentFailureReason?: string;
     createdAt: Date;
     updatedAt: Date;
 }

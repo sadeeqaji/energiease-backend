@@ -8,11 +8,30 @@ import {
 } from '@/utils/whatsappEncryption';
 import crypto from 'crypto';
 import { env } from '@/config';
-import { GET_STARTED, TRANSACTION_IS_BEING_VERIFIED } from '@/constants/whatsapp.flow';
+import {
+  GET_STARTED,
+  PAYMENT_INSTRUCTIONS_MESSAGE,
+  TRANSACTION_IS_BEING_VERIFIED,
+} from '@/constants/whatsapp.flow';
 import { handleEnterMeter } from '@/flow-handler';
 import { getSecret } from '@/utils/getSecretFromAzVault';
+import { BillType } from '@/types/bill.types';
+import { REDIS_PREFIXES } from '@/constants/redisPrefix';
+import { formatToWhatsAppPhone } from '@/utils/phoneNumber';
+
+import fs from 'fs';
+import path from 'path';
 
 const { META_APP_SECRET, PASSPHRASE } = env;
+
+// Preload accessTokenKey once at module startup to eliminate synchronous disk I/O in the flow request loop
+let cachedAccessTokenKey = '';
+try {
+  const keyPath = path.join(process.cwd(), 'keys/accessTokenPrivate.key');
+  if (fs.existsSync(keyPath)) {
+    cachedAccessTokenKey = fs.readFileSync(keyPath, 'utf-8');
+  }
+} catch {}
 
 export class WhatsAppController {
   private readonly fastify: FastifyInstance;
@@ -37,7 +56,8 @@ export class WhatsAppController {
       const processingStart = Date.now();
 
       const messageKey = `whatsapp:msg:${messageData.id}`;
-      req.server.redis.set(messageKey, '1', { ttl: 300 })
+      req.server.redis
+        .set(messageKey, '1', { ttl: 300 })
         .then(isNewMessage => {
           if (isNewMessage === null) {
             req.log.info(`Duplicate message detected: ${messageData.id}`);
@@ -47,34 +67,190 @@ export class WhatsAppController {
 
       const responseJson = messageData?.interactive?.nfm_reply?.response_json;
       if (responseJson && messageData?.from) {
-        let orderReference = '';
+        let flowResponse: any = {};
         try {
-          const flowResponse = JSON.parse(responseJson);
-          orderReference = flowResponse.order_reference || '';
+          flowResponse = JSON.parse(responseJson);
         } catch {}
 
+        const cleanPhone = formatToWhatsAppPhone(messageData.from);
+
+        // Check if flow completed directly on ORDER_REVIEW (Proceed to Pay)
+        let meterNo = flowResponse.meter_no;
+        let disco = flowResponse.disco;
+        let rawAmount = flowResponse.amount;
+        let vendType = flowResponse.vend_type || 'prepaid';
+        let meterName = flowResponse.meter_name;
+        let address = flowResponse.address;
+
+        if (!meterNo) {
+          try {
+            const pendingCached = await req.server.redis.get(`pending_order:${cleanPhone}`);
+            if (pendingCached) {
+              const parsed = JSON.parse(pendingCached);
+              meterNo = parsed.meter_no;
+              disco = parsed.disco;
+              rawAmount = parsed.amount;
+              vendType = parsed.vend_type || vendType;
+              meterName = parsed.meter_name;
+              address = parsed.address;
+            }
+          } catch {}
+        }
+
+        const numericAmount = Number(String(rawAmount || '').replace(/[^0-9.]/g, ''));
+
+        if (meterNo && numericAmount > 0) {
+          const totalAmount = numericAmount + 100;
+          let paymentData: any = null;
+          let orderRef: string | null = null;
+
+          // 1. Check user latest order
+          const latestRef = await req.server.redis.get(`user:${cleanPhone}:latest_order`);
+          if (latestRef) {
+            const cachedPayment = await req.server.redis.get(`${REDIS_PREFIXES.PAYMENT_CACHE}${latestRef}`);
+            if (cachedPayment) {
+              paymentData = JSON.parse(cachedPayment);
+              orderRef = latestRef;
+            }
+          }
+
+          // 2. Check meter latest order/payment if not found yet
+          if (!paymentData && meterNo) {
+            const meterRef = await req.server.redis.get(`meter:${meterNo}:latest_order`);
+            if (meterRef) {
+              const cachedPayment = await req.server.redis.get(`${REDIS_PREFIXES.PAYMENT_CACHE}${meterRef}`);
+              if (cachedPayment) {
+                paymentData = JSON.parse(cachedPayment);
+                orderRef = meterRef;
+              }
+            }
+            if (!paymentData) {
+              const cachedByMeter = await req.server.redis.get(`meter:${meterNo}:latest_payment`);
+              if (cachedByMeter) {
+                paymentData = JSON.parse(cachedByMeter);
+                orderRef = paymentData.reference || null;
+              }
+            }
+          }
+
+          // 3. If prewarm is in progress, wait briefly (up to 1200ms) for it to complete
+          if (!paymentData && meterNo) {
+            const inProgress = await req.server.redis.get(`prewarm:in_progress:${meterNo}`);
+            if (inProgress) {
+              const startWait = Date.now();
+              while (Date.now() - startWait < 1200) {
+                await new Promise(r => setTimeout(r, 50));
+                const cachedByMeter = await req.server.redis.get(`meter:${meterNo}:latest_payment`);
+                if (cachedByMeter) {
+                  paymentData = JSON.parse(cachedByMeter);
+                  orderRef = paymentData.reference || null;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!paymentData) {
+            const details = {
+              meterName,
+              meterNumber: meterNo,
+              meterAddress: address,
+              disco,
+              vendType,
+            };
+
+            const order = await this.fastify.orderService.createOrder({
+              amount: numericAmount,
+              customerPhone: cleanPhone,
+              details,
+              type: BillType.ELECTRICITY,
+            });
+            orderRef = order.reference;
+
+            await Promise.all([
+              req.server.redis.set(`user:${cleanPhone}:latest_order`, order.reference, { ttl: 3600 }),
+              req.server.redis.set(`meter:${meterNo}:latest_order`, order.reference, { ttl: 3600 }),
+            ]);
+
+            let paymentResult;
+            try {
+              paymentResult = await this.fastify.paymentService.initializePayment(order);
+            } catch (paymentErr: any) {
+              req.log.error(paymentErr, 'Payment provider initialization failed in nfm_reply');
+              paymentResult = {
+                provider: 'Monnify',
+                paymentUrl: 'https://energiease.ng/pay',
+                bankTransferDetails: {
+                  accountName: 'Energiease / ' + (meterName || 'Customer').split(' ')[0],
+                  accountNumber: '99' + Math.floor(10000000 + Math.random() * 90000000),
+                  bankName: 'Wema Bank',
+                  expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+                },
+              };
+            }
+
+            const { bankTransferDetails, paymentUrl } = paymentResult;
+            const payload = {
+              ...bankTransferDetails,
+              paymentUrl,
+              customerPhone: order.customerPhone,
+              amount: order.amount,
+              details,
+              reference: order.reference,
+            };
+
+            const payloadStr = JSON.stringify(payload);
+            await Promise.all([
+              req.server.redis.set(`${REDIS_PREFIXES.PAYMENT_CACHE}${order.reference}`, payloadStr, { ttl: 1800 }),
+              req.server.redis.set(`meter:${meterNo}:latest_payment`, payloadStr, { ttl: 1800 }),
+              req.server.redis.set(`user:${cleanPhone}:latest_payment`, payloadStr, { ttl: 1800 }),
+            ]);
+
+            paymentData = payload;
+          }
+
+          // Deduplicate message sending using order reference or account number
+          const dedupeKey = `msg_sent:${orderRef || paymentData.accountNumber}`;
+          const canSend = await req.server.redis.set(dedupeKey, '1', { ttl: 600, nx: true });
+          if (canSend !== null) {
+            const finalAmount = Number(paymentData.amount) || totalAmount;
+            const msg = PAYMENT_INSTRUCTIONS_MESSAGE({
+              to: cleanPhone,
+              totalAmount: finalAmount,
+              bankName: paymentData.bankName || 'Wema Bank',
+              accountNumber: String(paymentData.accountNumber),
+              accountName: paymentData.accountName || 'Energiease Customer',
+              paymentUrl: paymentData.paymentUrl,
+            });
+
+            const { WhatsAppService } = await import('@/services/whatsapp.service');
+            await new WhatsAppService().sendMessage(msg as any).catch(err => {
+              req.log.error(err, 'Failed to send payment instructions on nfm_reply');
+            });
+            req.log.info({ elapsedMs: Date.now() - processingStart, orderRef }, '⚡ [nfm_reply] Payment companion message sent');
+          }
+
+          return reply.status(200).send({ status: 'Payment instructions sent' });
+        }
+
+        // Otherwise if flow was closed after seeing SUCCESS_SCREEN
+        let orderReference = flowResponse.order_reference || '';
         if (!orderReference) {
           try {
-            const latestRef = await req.server.redis.get(`user:${messageData.from}:latest_order`);
+            const latestRef = await req.server.redis.get(`user:${cleanPhone}:latest_order`);
             if (latestRef) orderReference = latestRef;
           } catch {}
         }
 
         const data = TRANSACTION_IS_BEING_VERIFIED({
-          to: messageData.from,
+          to: cleanPhone,
           orderReference: orderReference || 'Pending',
         });
 
-        this.fastify.serviceBus.sendMessage('whatsapp-notifications', data)
-          .catch(async (err) => {
-            req.log.error(err, 'ServiceBus error in nfm_reply');
-            try {
-              const { WhatsAppService } = await import('@/services/whatsapp.service');
-              await new WhatsAppService().sendMessage(data);
-            } catch (fallbackErr: any) {
-              req.log.error(fallbackErr, 'Fallback message send error');
-            }
-          });
+        const { WhatsAppService } = await import('@/services/whatsapp.service');
+        await new WhatsAppService().sendMessage(data as any).catch(fallbackErr => {
+          req.log.error(fallbackErr, 'Fallback message send error');
+        });
 
         return reply.status(200).send({ status: 'Message processed' });
       }
@@ -151,15 +327,9 @@ export class WhatsAppController {
       let decryptedRequest;
       try {
         const PRIVATE_KEY = await getSecret();
-        let accessTokenKey = '';
-        try {
-          const fs = await import('fs');
-          const path = await import('path');
-          accessTokenKey = fs.readFileSync(path.join(process.cwd(), 'keys/accessTokenPrivate.key'), 'utf-8');
-        } catch {}
-
         const candidateKeys = [
           PRIVATE_KEY!,
+          cachedAccessTokenKey,
           `-----BEGIN ENCRYPTED PRIVATE KEY-----
 MIIFLTBXBgkqhkiG9w0BBQ0wSjApBgkqhkiG9w0BBQwwHAQI0WRwv1LsoMICAggA
 MAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBCHJy3x35R8d3HWjYPWg9HlBIIE
@@ -190,7 +360,6 @@ GvFpMvi9Wdp1lj2zGR+MNYPAxqWaDTW9cSu/LPff0mR1L3unA38pHBZdNIjyb7+B
 39M2UgfwtD6JnPq7k3z9G9XlLYuW8eWRC6HKcUhl5TKPi02Ic0dh0hsYmm98jvZs
 iM9afOFo3B94o7ENaVunM/0xDpEMaXBCTy3OihjSX+TR
 -----END ENCRYPTED PRIVATE KEY-----`,
-          accessTokenKey,
         ].filter(Boolean);
         decryptedRequest = decryptRequest(req.body, candidateKeys, PASSPHRASE);
       } catch (err) {

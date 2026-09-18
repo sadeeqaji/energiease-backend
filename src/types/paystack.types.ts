@@ -2,6 +2,7 @@ export interface PaystackInitTransactionPayload {
     email: string;
     amount: string;
     reference?: string;
+    callback_url?: string;
     currency?: string;
     metadata?: Record<string, any>;
 }

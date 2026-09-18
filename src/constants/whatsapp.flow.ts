@@ -20,7 +20,7 @@ export const KYC_FLOW_MESSAGE = (to: string) => ({
     action: {
       name: 'flow',
       parameters: {
-        mode: env.FLOW_MODE || 'draft',
+        ...(env.FLOW_MODE === 'draft' ? { mode: 'draft' } : {}),
         flow_id: '2954602864703606',
         flow_message_version: '3',
         flow_token: 'kyc',
@@ -93,7 +93,7 @@ export const GET_STARTED = (to: string) => ({
     action: {
       name: 'flow',
       parameters: {
-        mode: env.FLOW_MODE || 'draft',
+        ...(env.FLOW_MODE === 'draft' ? { mode: 'draft' } : {}),
         flow_id: env.FLOW_ID,
         flow_message_version: '3',
         flow_token: 'menu',
@@ -202,6 +202,84 @@ export const ERROR_MESSAGE = {
   text: {
     body: 'Oops! Something went wrong. Please try again later.',
   },
+};
+
+export const PAYMENT_INSTRUCTIONS_MESSAGE = ({
+  to,
+  totalAmount,
+  bankName,
+  accountNumber,
+  accountName,
+  paymentUrl,
+}: {
+  to: string;
+  totalAmount: string | number;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  paymentUrl?: string;
+}) => {
+  const cleanTo = String(to).replace(/[^0-9]/g, '');
+  const formattedAmount =
+    typeof totalAmount === 'number'
+      ? totalAmount.toLocaleString()
+      : String(totalAmount);
+
+  if (paymentUrl) {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: cleanTo,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        header: {
+          type: 'text',
+          text: '⚡ Complete Your Payment',
+        },
+        body: {
+          text:
+            `💰 Amount to Pay: *₦${formattedAmount}*\n\n` +
+            `*Dedicated Bank Transfer Details:*\n` +
+            `🏦 Bank: *${bankName}*\n` +
+            `🔢 Account Number: \`${accountNumber}\`\n` +
+            `👤 Account Name: *${accountName}*\n` +
+            `⏳ Expires in: *30 mins*\n\n` +
+            `💡 *Tap the account number above to copy it instantly!*\n` +
+            `Or tap the button below to pay online via Card or Bank Transfer:`,
+        },
+        action: {
+          name: 'cta_url',
+          parameters: {
+            display_text: 'Pay Online Now 💳',
+            url: paymentUrl,
+          },
+        },
+        footer: {
+          text: 'Token delivered automatically upon payment',
+        },
+      },
+    };
+  }
+
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: cleanTo,
+    type: 'text',
+    text: {
+      body:
+        `⚡ *Energiease Payment Details*\n\n` +
+        `💰 Amount to Pay: *₦${formattedAmount}*\n\n` +
+        `*Dedicated Bank Transfer Details:*\n` +
+        `🏦 Bank: *${bankName}*\n` +
+        `🔢 Account Number: \`${accountNumber}\`\n` +
+        `👤 Account Name: *${accountName}*\n` +
+        `⏳ Expires in: *30 mins*\n\n` +
+        `💡 *Tap the account number above to copy it instantly!*\n\n` +
+        `Your electricity token will be delivered right here in this chat as soon as payment is confirmed.`,
+    },
+  };
 };
 
 export const TRANSACTION_IS_BEING_VERIFIED = ({

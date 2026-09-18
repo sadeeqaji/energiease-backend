@@ -19,13 +19,17 @@ const env = cleanEnv(process.env, {
   MONNIFY_TIMEOUT: str(),
   MONNIFY_BASE_URL: str(),
   PAYSTACK_SECRET_KEY: str(),
-  KEY_VAULT_URL: str({ default: undefined }),
   FLOW_ID: str(),
-  FLOW_MODE: str({ default: 'draft' }),
+  FLOW_MODE: str({ default: 'published', choices: ['draft', 'published'] }),
   REDIS_CONNECTION_STRING: str({ default: undefined }),
   REDIS_ACCESS_KEY: str({ default: undefined }),
   SERVICE_BUS_CONNECTION_STRING: str({ default: undefined }),
-  SLACK_WEBHOOK_URL: str({ default: undefined })
+  SLACK_WEBHOOK_URL: str({ default: undefined }),
+  BOT_PHONE_NUMBER: str({ default: '2349139932585' }),
+  APP_BASE_URL: str({ default: 'https://krishna-incongruent-interconvertibly.ngrok-free.dev' }),
+  TELEGRAM_BOT_TOKEN: str({ default: undefined }),
+  TELEGRAM_CHAT_ID: str({ default: undefined }),
+  TELEGRAM_TOPIC_ID: str({ default: undefined })
 });
 
 export default env;

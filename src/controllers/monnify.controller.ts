@@ -51,14 +51,10 @@ export class MonnifyWebhookController {
         return this.MONNIFY_IPS.includes(ip);
     }
 
-    private async isEventProcessed(transactionId: string): Promise<boolean> {
+    private async acquireWebhookLock(transactionId: string): Promise<boolean> {
         const key = `${REDIS_PREFIXES.WEBHOOK}${transactionId}`;
-        return await this.fastify.redis.exists(key) === true;
-    }
-
-    private async markEventAsProcessed(transactionId: string): Promise<void> {
-        const key = `${REDIS_PREFIXES.WEBHOOK}${transactionId}`;
-        await this.fastify.redis.set(key, '1', { ttl: this.EVENT_TTL });
+        const acquired = await this.fastify.redis.set(key, '1', { ttl: this.EVENT_TTL, nx: true });
+        return acquired !== null;
     }
 
     private async checkRequestRate(ip: string): Promise<boolean> {
@@ -130,14 +126,14 @@ export class MonnifyWebhookController {
             case 'SUCCESSFUL_TRANSACTION': {
                 const transactionId = event.eventData.transactionReference;
 
-                if (await this.isEventProcessed(transactionId)) {
-                    this.fastify.log.info(`Duplicate transaction skipped: ${transactionId}`);
+                const isNewEvent = await this.acquireWebhookLock(transactionId);
+                if (!isNewEvent) {
+                    this.fastify.log.info(`Duplicate transaction skipped (already processing/processed): ${transactionId}`);
                     return;
                 }
 
                 try {
                     await this.handleSuccessfulTransaction(event);
-                    await this.markEventAsProcessed(transactionId);
                 } catch (error) {
                     this.fastify.log.error(`Transaction processing failed: ${transactionId}`, error);
                     throw error; // Will be caught by the global handler

@@ -1,5 +1,12 @@
 import axios from 'axios';
+import https from 'https';
 import { MonnifyConfig } from '@/config/monnify.config';
+
+const httpsAgent = new https.Agent({
+    keepAlive: true,
+    maxSockets: 50,
+    keepAliveMsecs: 30000,
+});
 import { AppException } from '@/utils/appException.utils';
 import {
     BankTransferPayload,
@@ -54,7 +61,8 @@ export class MonnifyService {
                         Authorization: `Basic ${authString}`,
                         'Content-Type': 'application/json'
                     },
-                    timeout: 10000
+                    timeout: 10000,
+                    httpsAgent,
                 }
             );
 
@@ -91,7 +99,6 @@ export class MonnifyService {
     private async _request(method: 'POST' | 'GET', endpoint: string, data?: any) {
         try {
             const token = await this.getAccessToken();
-            console.log('Token:', token);
             return await axios({
                 method,
                 url: `${MonnifyConfig.baseUrl}${endpoint}`,
@@ -100,7 +107,8 @@ export class MonnifyService {
                     'Content-Type': 'application/json'
                 },
                 data,
-                timeout: 15000
+                timeout: 15000,
+                httpsAgent,
             });
         } catch (error) {
             if (axios.isAxiosError(error)) {

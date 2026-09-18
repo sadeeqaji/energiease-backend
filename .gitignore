@@ -12,6 +12,10 @@ yarn.lock
 .env.test
 .env.*.local
 .env*
+keys/
+*.pem
+*.key
+*.pdf
 
 # Logs
 logs/

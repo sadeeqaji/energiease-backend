@@ -6,6 +6,8 @@ import { WhatsAppService } from '../whatsapp.service';
 import { ELECTRICITY_PURCHASE_CONFIRMATION } from '@/constants/whatsapp.flow';
 import { formatNigerianPhoneNumber } from '@/utils/phoneNumber';
 
+import receiptService from '../receipt.service';
+
 const whatsappService = new WhatsAppService();
 
 export class BuyPowerProvider implements BillProvider {
@@ -35,10 +37,42 @@ export class BuyPowerProvider implements BillProvider {
                     token: data.data.token,
                     unit: data.data.units
                 }
-            ))
+            ));
+
+            // Automatically generate and deliver official PDF receipt to customer
+            receiptService.sendReceipt(
+                {
+                    reference: orderReference,
+                    customerPhone: userInfo.phone,
+                    amount: data.data.totalAmountPaid,
+                    providerOrderId: data.data.orderId,
+                    details: {
+                        ...details,
+                        disco: data.data.disco,
+                        units: data.data.units,
+                        token: data.data.token,
+                        meterNumber: details.meterNumber,
+                        vendType: details.vendType || 'PREPAID',
+                    },
+                },
+                {
+                    to: userInfo.phone,
+                    token: data.data.token,
+                    units: data.data.units,
+                    amount: data.data.totalAmountPaid,
+                }
+            ).catch(receiptErr => {
+                console.error('[BuyPowerProvider] Async receipt delivery error:', receiptErr);
+            });
+
             return {
                 success: true,
-                orderId: data.data.orderId
+                orderId: data.data.orderId,
+                token: data.data.token,
+                units: data.data.units,
+                amount: data.data.totalAmountPaid,
+                disco: data.data.disco,
+                raw: data.data,
             };
 
         } catch (error) {

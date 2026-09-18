@@ -40,9 +40,14 @@ export interface VendParams {
     userInfo: { phone: string };
 }
 
-interface VendResponse {
+export interface VendResponse {
     success: boolean;
     orderId?: string;
+    token?: string;
+    units?: string | number;
+    amount?: number;
+    disco?: string;
+    raw?: any;
 }
 
 export interface BillProvider {

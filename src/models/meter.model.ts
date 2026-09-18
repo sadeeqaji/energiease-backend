@@ -13,6 +13,9 @@ const MeterSchema: Schema<Meter> = new Schema({
     createdAt: { type: Date, default: Date.now },
 });
 
+MeterSchema.index({ phoneNumber: 1 });
+MeterSchema.index({ meterNumber: 1, discoCode: 1 });
+
 const MeterModel: Model<Meter> = mongoose.model<Meter>('Meter', MeterSchema);
 
 export { MeterModel, Meter };

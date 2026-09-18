@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { WhatsAppService } from '../../services/whatsapp.service';
-import { isServiceBusError } from '@azure/service-bus';
 
 interface WhatsAppMessage {
     to: string;
@@ -80,8 +79,8 @@ export class WhatsAppConsumer {
         const attempt = message._meta?.attempt || 0;
         const nextAttempt = attempt + 1;
 
-        if (isServiceBusError(error)) {
-            this.fastify.log.error(`Service Bus error: ${error.code} - ${error.message}`);
+        if (error && (error as any).code) {
+            this.fastify.log.error(`Queue error: ${(error as any).code} - ${error.message}`);
         }
 
         if (nextAttempt >= this.maxAttempts) {
