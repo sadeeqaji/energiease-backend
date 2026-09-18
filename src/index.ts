@@ -47,8 +47,9 @@ fastify.register(dbConnectorPlugin);
 
 const start = async () => {
   try {
-    await fastify.listen({ host: env.HOST, port: env.PORT });
-    console.log(`Server running at http://localhost:${env.PORT}`);
+    const port = Number(process.env.PORT) || env.PORT || 8080;
+    await fastify.listen({ host: '0.0.0.0', port });
+    console.log(`Server running at http://0.0.0.0:${port}`);
 
     // Start BuyPower 15-minute wallet balance monitor
     const { WalletMonitor } = await import('./jobs/walletMonitor.job');
