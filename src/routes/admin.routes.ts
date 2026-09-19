@@ -84,4 +84,23 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [requirePermission('view_customers')] },
     adminController.getCustomers.bind(adminController)
   );
+
+  // Staff & Team Management (Super Admin Exclusive: 'manage_admins')
+  fastify.get(
+    '/users',
+    { preHandler: [requirePermission('manage_admins')] },
+    adminController.listUsers.bind(adminController)
+  );
+
+  fastify.post(
+    '/users',
+    { preHandler: [requirePermission('manage_admins')] },
+    adminController.createUser.bind(adminController)
+  );
+
+  fastify.delete(
+    '/users/:id',
+    { preHandler: [requirePermission('manage_admins')] },
+    adminController.deleteUser.bind(adminController)
+  );
 }

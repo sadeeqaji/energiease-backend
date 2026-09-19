@@ -29,7 +29,7 @@ export class AdminController {
   async getStats(req: FastifyRequest<any>, reply: FastifyReply) {
     try {
       const monnifyService = (req.server as any).monnifyService;
-      const stats = await adminService.getDashboardStats(monnifyService);
+      const stats = await adminService.getDashboardStats(monnifyService, req.user?.role);
       return reply.send({ success: true, ...stats });
     } catch (error: any) {
       return reply.status(500).send({ success: false, error: error.message });
@@ -78,7 +78,7 @@ export class AdminController {
         interventionOnly: query.interventionOnly === 'true',
         startDate: query.startDate,
         endDate: query.endDate,
-      });
+      }, req.user?.role);
       return reply.send({ success: true, ...result });
     } catch (error: any) {
       return reply.status(500).send({ success: false, error: error.message });
@@ -88,7 +88,7 @@ export class AdminController {
   async getOrderDetail(req: FastifyRequest<any>, reply: FastifyReply) {
     try {
       const params = (req.params || {}) as { reference: string };
-      const order = await adminService.getOrderDetail(params.reference);
+      const order = await adminService.getOrderDetail(params.reference, req.user?.role);
       return reply.send({ success: true, order });
     } catch (error: any) {
       return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
@@ -195,6 +195,44 @@ export class AdminController {
       return reply.send({ success: true, ...result });
     } catch (error: any) {
       return reply.status(500).send({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Team / Staff user management (Superadmin only)
+   */
+  async listUsers(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const users = await adminService.listStaffUsers();
+      return reply.send({ success: true, users });
+    } catch (error: any) {
+      return reply.status(500).send({ success: false, error: error.message });
+    }
+  }
+
+  async createUser(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const body = req.body as {
+        firstName: string;
+        lastName: string;
+        email: string;
+        password: string;
+        role: 'superadmin' | 'admin' | 'support' | 'accounting';
+      };
+      const user = await adminService.createStaffUser(body);
+      return reply.status(201).send({ success: true, user });
+    } catch (error: any) {
+      return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
+    }
+  }
+
+  async deleteUser(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const params = req.params as { id: string };
+      const result = await adminService.deleteStaffUser(params.id, req.user.user_id);
+      return reply.send(result);
+    } catch (error: any) {
+      return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
     }
   }
 }

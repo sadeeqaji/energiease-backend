@@ -1,6 +1,8 @@
 import OrderModel from '@/models/order.model';
 import UserModel from '@/models/user.model';
 import { MeterModel } from '@/models/meter.model';
+import AdminModel from '@/models/admin.model';
+import { roles } from '@/utils/rbac.util';
 import buyPowerService from './buypower.service';
 import { WhatsAppService } from './whatsapp.service';
 import { ELECTRICITY_PURCHASE_CONFIRMATION } from '@/constants/whatsapp.flow';
@@ -16,7 +18,7 @@ export class AdminService {
   /**
    * Get high-level executive dashboard statistics
    */
-  async getDashboardStats(monnifyService?: any) {
+  async getDashboardStats(monnifyService?: any, requesterRole?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -38,44 +40,26 @@ export class AdminService {
         console.error('Failed to get wallet balance in admin stats:', err?.message);
         return { balance: 0, commission: 0 };
       }),
-      monnifyService ? monnifyService.getWalletBalance().catch(() => ({ availableBalance: 0, ledgerBalance: 0 })) : Promise.resolve({ availableBalance: 0, ledgerBalance: 0 }),
+      monnifyService?.getWalletBalance().catch((err: any) => {
+        console.error('Failed to get Monnify balance in admin stats:', err?.message);
+        return { availableBalance: 0, ledgerBalance: 0 };
+      }),
     ]);
 
-    // Financial totals across all successful transactions
-    let totalCustomerPaid = 0;
-    let totalVendAmount = 0;
-    let totalServiceFees = 0;
-    let totalUnits = 0;
+    const totalCustomerPaid = successfulOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+    const totalUnits = successfulOrders.reduce((sum, o) => {
+      const u = Number((o as any).providerResponse?.units || (o.details as any)?.units) || 0;
+      return sum + u;
+    }, 0);
 
-    for (const order of successfulOrders) {
-      const details = (order.details || {}) as any;
-      const paid = order.amount || 0;
-      const fee = order.serviceFee || 100;
-      const vend = Math.max(paid - fee, 0);
-      const units = Number((order as any).providerResponse?.units || details.units || 0) || 0;
-
-      totalCustomerPaid += paid;
-      totalVendAmount += vend;
-      totalServiceFees += fee;
-      totalUnits += units;
-    }
-
-    // BuyPower 1.5% commission earned
+    const totalServiceFees = successfulOrders.reduce((sum, o) => sum + (o.serviceFee || 100), 0);
+    const totalVendAmount = successfulOrders.reduce((sum, o) => sum + Math.max((o.amount || 0) - (o.serviceFee || 100), 0), 0);
     const totalBuyPowerCommission = Math.round(totalVendAmount * 0.015 * 100) / 100;
-    // Monnify 1.6125% fee deducted (1.5% + 7.5% VAT)
     const totalMonnifyFees = Math.round(totalCustomerPaid * 0.016125 * 100) / 100;
-    // Net profit
     const netProfit = Math.round((totalServiceFees + totalBuyPowerCommission - totalMonnifyFees) * 100) / 100;
 
-    // Today's statistics
-    let todayCustomerPaid = 0;
-    let todayVendAmount = 0;
-    for (const o of todayOrders) {
-      const paid = o.amount || 0;
-      const fee = o.serviceFee || 100;
-      todayCustomerPaid += paid;
-      todayVendAmount += Math.max(paid - fee, 0);
-    }
+    const todayCustomerPaid = todayOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+    const todayVendAmount = todayOrders.reduce((sum, o) => sum + Math.max((o.amount || 0) - (o.serviceFee || 100), 0), 0);
     const todayBuyPowerCommission = Math.round(todayVendAmount * 0.015 * 100) / 100;
     const todayMonnifyFees = Math.round(todayCustomerPaid * 0.016125 * 100) / 100;
     const todayNetProfit = Math.round((todayOrders.length * 100 + todayBuyPowerCommission - todayMonnifyFees) * 100) / 100;
@@ -83,14 +67,16 @@ export class AdminService {
     const successCount = successfulOrders.length;
     const successRate = totalOrdersCount > 0 ? Math.round((successCount / totalOrdersCount) * 1000) / 10 : 100;
 
+    const isSupport = requesterRole === 'support';
+
     return {
       kpis: {
         totalRevenue: totalCustomerPaid,
         totalVendAmount,
         totalServiceFees,
-        totalBuyPowerCommission,
-        totalMonnifyFees,
-        netProfit,
+        totalBuyPowerCommission: isSupport ? 0 : totalBuyPowerCommission,
+        totalMonnifyFees: isSupport ? 0 : totalMonnifyFees,
+        netProfit: isSupport ? 0 : netProfit,
         totalOrders: totalOrdersCount,
         successOrders: successCount,
         pendingOrders: pendingOrdersCount,
@@ -101,13 +87,13 @@ export class AdminService {
           ordersCount: todayOrders.length,
           customerPaid: todayCustomerPaid,
           vendAmount: todayVendAmount,
-          netProfit: todayNetProfit,
+          netProfit: isSupport ? 0 : todayNetProfit,
         },
       },
       wallet: {
         provider: 'buypower',
         balance: Number(walletData.balance) || 0,
-        commissionBalance: Number(walletData.commission) || 0,
+        commissionBalance: isSupport ? 0 : (Number(walletData.commission) || 0),
         status: (Number(walletData.balance) || 0) < 50000 ? 'CRITICAL' : (Number(walletData.balance) || 0) < 100000 ? 'WARNING' : 'HEALTHY',
       },
       monnifyWallet: {
@@ -228,7 +214,7 @@ export class AdminService {
     interventionOnly?: boolean;
     startDate?: string;
     endDate?: string;
-  }) {
+  }, requesterRole?: string) {
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
     const skip = (page - 1) * limit;
@@ -276,6 +262,8 @@ export class AdminService {
         .lean(),
     ]);
 
+    const isSupport = requesterRole === 'support';
+
     const formattedOrders = orders.map((o) => {
       const d = (o.details || {}) as any;
       const paid = o.amount || 0;
@@ -295,9 +283,9 @@ export class AdminService {
         amount: paid,
         vendAmount: vend,
         serviceFee: fee,
-        buypowerCommission: buypowerComm,
-        monnifyFee,
-        netProfit,
+        buypowerCommission: isSupport ? undefined : buypowerComm,
+        monnifyFee: isSupport ? undefined : monnifyFee,
+        netProfit: isSupport ? undefined : netProfit,
         status: o.status,
         disco: d.disco || 'N/A',
         meterNumber: d.meterNumber || 'N/A',
@@ -326,7 +314,7 @@ export class AdminService {
   /**
    * Get complete details of a single order
    */
-  async getOrderDetail(reference: string) {
+  async getOrderDetail(reference: string, requesterRole?: string) {
     const order = await OrderModel.findOne({ reference }).lean();
     if (!order) {
       throw AppException.NotFound(`Order not found with reference ${reference}`);
@@ -339,16 +327,27 @@ export class AdminService {
     const monnifyFee = Math.round(paid * 0.016125 * 100) / 100;
     const netProfit = Math.round((fee + buypowerCommission - monnifyFee) * 100) / 100;
 
+    const isSupport = requesterRole === 'support';
+
     return {
       ...order,
-      financials: {
-        amountPaid: paid,
-        vendCost: vend,
-        serviceFee: fee,
-        buypowerCommission,
-        monnifyFee,
-        netProfit,
-      },
+      buypowerCommission: isSupport ? undefined : buypowerCommission,
+      monnifyFee: isSupport ? undefined : monnifyFee,
+      netProfit: isSupport ? undefined : netProfit,
+      financials: isSupport
+        ? {
+            amountPaid: paid,
+            vendCost: vend,
+            serviceFee: fee,
+          }
+        : {
+            amountPaid: paid,
+            vendCost: vend,
+            serviceFee: fee,
+            buypowerCommission,
+            monnifyFee,
+            netProfit,
+          },
     };
   }
 
@@ -780,6 +779,93 @@ export class AdminService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * List all staff accounts (Super Admin only)
+   */
+  async listStaffUsers() {
+    const users = await AdminModel.find()
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return users.map((u) => ({
+      id: u._id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      role: u.role,
+      permissions: u.permissions || [],
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+    }));
+  }
+
+  /**
+   * Create a new staff account (Super Admin only)
+   */
+  async createStaffUser(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    role: 'superadmin' | 'admin' | 'support' | 'accounting';
+  }) {
+    const { firstName, lastName, email, password, role } = data;
+    if (!firstName || !lastName || !email || !password || !role) {
+      throw AppException.BadRequest('Missing required fields: firstName, lastName, email, password, role');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await AdminModel.findOne({ email: normalizedEmail });
+    if (existing) {
+      throw AppException.Conflict(`Staff user already exists with email: ${normalizedEmail}`);
+    }
+
+    const assignedPermissions = roles[role] || [];
+
+    const newAdmin = new AdminModel({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      password,
+      role,
+      permissions: assignedPermissions,
+    });
+
+    await newAdmin.save();
+
+    return {
+      id: newAdmin._id,
+      firstName: newAdmin.firstName,
+      lastName: newAdmin.lastName,
+      email: newAdmin.email,
+      role: newAdmin.role,
+      permissions: newAdmin.permissions,
+      createdAt: newAdmin.createdAt,
+    };
+  }
+
+  /**
+   * Delete a staff user (Super Admin only)
+   */
+  async deleteStaffUser(targetUserId: string, requesterUserId: string) {
+    if (targetUserId === requesterUserId) {
+      throw AppException.BadRequest('You cannot delete your own active superadmin account');
+    }
+
+    const target = await AdminModel.findById(targetUserId);
+    if (!target) {
+      throw AppException.NotFound('Staff user not found');
+    }
+
+    if (target.email === 'sadiq@energiease.ng') {
+      throw AppException.Forbidden('The primary founder account (sadiq@energiease.ng) cannot be removed');
+    }
+
+    await AdminModel.findByIdAndDelete(targetUserId);
+    return { success: true, message: `Staff user ${target.email} removed successfully` };
   }
 }
 
