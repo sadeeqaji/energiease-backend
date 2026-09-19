@@ -24,7 +24,7 @@ const AdminSchema: Schema<Admin> = new Schema({
   },
   role: {
     type: String,
-    enum: ['superadmin', 'admin', 'support'],
+    enum: ['superadmin', 'admin', 'support', 'accounting'],
     default: 'admin',
   },
   permissions: {

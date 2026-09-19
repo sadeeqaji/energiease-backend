@@ -13,7 +13,8 @@ async function authenticationPlugin(fastify: FastifyInstance) {
         throw AppException.Unauthorized('Authentication required');
       }
       const decoded = verifyToken(token!) as JwtTokenPayload;
-      if (decoded?.role !== 'admin' && !decoded?.user_id) {
+      const staffRoles = ['superadmin', 'admin', 'support', 'accounting'];
+      if (!decoded?.user_id || !staffRoles.includes(decoded?.role)) {
         throw AppException.Unauthorized('Authentication required');
       }
       req.user = decoded;

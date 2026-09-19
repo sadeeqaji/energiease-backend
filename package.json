@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "seed": "tsx src/seeds/index.ts",
+    "seed": "tsx --env-file=.env src/seeds/index.ts",
     "build": "tsc && tsc-alias",
     "start": "node -r tsconfig-paths/register dist/index.js",
     "lint": "eslint src --ext .ts",

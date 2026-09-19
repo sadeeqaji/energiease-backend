@@ -2,8 +2,25 @@ import { Role } from '@/types/admin.types';
 
 export const roles: Record<Role, string[]> = {
   user: ['view_profile', 'update_profile'],
-  admin: ['view_kyc', 'approve_kyc', 'reject_kyc', 'manage_credit_limit'],
-  superadmin: ['manage_admins', 'manage_users', 'manage_credit_limit', 'manage_card'],
+  support: ['view_orders', 'manage_orders', 'send_tokens', 'view_customers'],
+  accounting: ['view_analytics', 'view_orders', 'view_accounting'],
+  admin: [
+    'view_analytics',
+    'view_orders',
+    'manage_orders',
+    'send_tokens',
+    'view_customers',
+    'view_accounting',
+  ],
+  superadmin: [
+    'view_analytics',
+    'view_orders',
+    'manage_orders',
+    'send_tokens',
+    'view_customers',
+    'view_accounting',
+    'manage_admins',
+  ],
 };
 
 export function hasPermission(role: Role, permission: string): boolean {
