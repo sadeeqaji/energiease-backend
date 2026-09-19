@@ -1,5 +1,7 @@
 import { MonnifyService } from './monnify.service';
 import { PaystackService } from './paystack.service';
+import { BuyPowerMFBService } from './buypower-mfb.service';
+import { BuyPowerMFBConfig } from '@/config/buypower-mfb.config';
 import { MonnifyInitTransactionPayload } from '@/types/monnify.types';
 import { PaystackInitTransactionPayload } from '@/types/paystack.types';
 import { transformBankDetails } from '@/utils/payment';
@@ -9,13 +11,14 @@ import { FastifyInstance } from 'fastify';
 import { env } from '@/config';
 
 export class PaymentService {
-    private paymentProviders: { name: PaymentProviders; service: MonnifyService | PaystackService; priority: number }[];
+    private paymentProviders: { name: PaymentProviders; service: MonnifyService | PaystackService | BuyPowerMFBService; priority: number }[];
     private readonly fastify: FastifyInstance;
 
     constructor(fastify: FastifyInstance) {
         this.paymentProviders = [
-            { name: 'Monnify' as PaymentProviders, service: fastify.monnifyService, priority: 1 },
-            { name: 'Paystack' as PaymentProviders, service: fastify.paystackService, priority: 2 },
+            { name: 'BuyPowerMFB' as PaymentProviders, service: fastify.buyPowerMFBService, priority: 1 },
+            { name: 'Monnify' as PaymentProviders, service: fastify.monnifyService, priority: 2 },
+            { name: 'Paystack' as PaymentProviders, service: fastify.paystackService, priority: 3 },
         ].sort((a, b) => a.priority - b.priority);
         this.fastify = fastify;
 
@@ -36,7 +39,22 @@ export class PaymentService {
                 let paymentResponse;
                 let bankTransferDetails;
 
-                if (provider.name === 'Monnify') {
+                if (provider.name === 'BuyPowerMFB') {
+                    if (!BuyPowerMFBConfig.apiKey) {
+                        continue;
+                    }
+                    const invoiceData = await this.fastify.buyPowerMFBService.createInvoiceAccount({
+                        exchangeRef: order.reference,
+                        amount: order.amount,
+                        description: `Energiease electricity token - Order #${order.reference}`,
+                        name: 'Energiease Customer',
+                        email: 'support@energiease.ng',
+                    });
+                    bankTransferDetails = transformBankDetails('BuyPowerMFB', invoiceData);
+                    paymentResponse = {
+                        checkoutUrl: redirectUrl,
+                    };
+                } else if (provider.name === 'Monnify') {
                     const payload: MonnifyInitTransactionPayload = {
                         amount: order.amount,
                         customerName: 'Customer',

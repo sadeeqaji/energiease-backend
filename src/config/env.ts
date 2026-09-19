@@ -28,7 +28,10 @@ const env = cleanEnv(process.env, {
   TELEGRAM_BOT_TOKEN: str({ default: undefined }),
   TELEGRAM_CHAT_ID: str({ default: undefined }),
   TELEGRAM_TOPIC_ID: str({ default: undefined }),
-  JWT_SECRET: str({ default: 'energiease-jwt-secret-key-change-in-prod' })
+  JWT_SECRET: str({ default: 'energiease-jwt-secret-key-change-in-prod' }),
+  BUYPOWER_MFB_BASE_URL: str({ default: 'https://api.buypowermfb.net' }),
+  BUYPOWER_MFB_API_KEY: str({ default: undefined }),
+  BUYPOWER_MFB_WEBHOOK_SECRET: str({ default: undefined })
 });
 
 export default env;

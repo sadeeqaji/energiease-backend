@@ -6,4 +6,4 @@ export interface BankDetails {
 }
 
 
-export type PaymentProviders = 'Monnify' | 'Paystack';
+export type PaymentProviders = 'Monnify' | 'Paystack' | 'BuyPowerMFB';

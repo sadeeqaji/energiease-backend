@@ -15,6 +15,13 @@ export function transformBankDetails(provider: PaymentProviders, data: any): Ban
             expiresOn: data.expiresOn,
             accountName: data.accountName,
         };
+    } else if (provider === 'BuyPowerMFB') {
+        return {
+            bankName: data.bankName || 'BuyPower MFB',
+            accountNumber: data.nuban || data.accountNumber,
+            expiresOn: data.expiryDate || data.expireAt || '',
+            accountName: data.name || data.accountName || 'Energiease',
+        };
     } else {
         throw new Error('Unsupported payment provider');
     }
