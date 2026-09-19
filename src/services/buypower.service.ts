@@ -231,7 +231,67 @@ export class BuyPowerService {
             status: 'HEALTHY',
         };
     }
+
+    async getAllDiscosStatus(): Promise<Array<{
+        code: string;
+        name: string;
+        coverage: string;
+        isOnline: boolean;
+        successRate: number;
+        failureRate: number;
+        status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+        statusLabel: 'Online' | 'Slow' | 'Maintenance';
+    }>> {
+        const allProviders = await this.getReliabilityIndex();
+        const electricityProviders = (allProviders || []).filter(p => p.vertical === 'ELECTRICITY');
+
+        return STANDARD_DISCOS.map(disco => {
+            const alias = DISCO_ALIASES[disco.code] || disco.code;
+            const provider = electricityProviders.find(p => p.disco_code && p.disco_code.toUpperCase() === alias);
+
+            const isOnline = provider ? provider.provider_online !== false : true;
+            const successRate = provider?.success_percentage ?? 100;
+            const failureRate = provider?.failure_percentage ?? 0;
+
+            let status: 'HEALTHY' | 'DEGRADED' | 'DOWN' = 'HEALTHY';
+            let statusLabel: 'Online' | 'Slow' | 'Maintenance' = 'Online';
+
+            if (!isOnline) {
+                status = 'DOWN';
+                statusLabel = 'Maintenance';
+            } else if (successRate < 80) {
+                status = 'DEGRADED';
+                statusLabel = 'Slow';
+            }
+
+            return {
+                code: disco.code,
+                name: disco.name,
+                coverage: disco.coverage,
+                isOnline,
+                successRate,
+                failureRate,
+                status,
+                statusLabel,
+            };
+        });
+    }
 }
+
+export const STANDARD_DISCOS = [
+    { code: 'AEDC', name: 'Abuja Electricity', coverage: 'FCT, Kogi, Nasarawa, Niger' },
+    { code: 'EKEDC', name: 'Eko Electricity', coverage: 'Lagos (Island, Lekki, Apapa)' },
+    { code: 'IKEDC', name: 'Ikeja Electric', coverage: 'Lagos (Mainland, Ikeja, Ikorodu)' },
+    { code: 'IBEDC', name: 'Ibadan Electricity', coverage: 'Oyo, Ogun, Osun, Kwara' },
+    { code: 'EEDC', name: 'Enugu Electricity', coverage: 'Enugu, Abia, Imo, Anambra, Ebonyi' },
+    { code: 'PHED', name: 'Port Harcourt Electricity', coverage: 'Rivers, Bayelsa, Cross River, Akwa Ibom' },
+    { code: 'KEDCO', name: 'Kano Electricity', coverage: 'Kano, Katsina, Jigawa' },
+    { code: 'JED', name: 'Jos Electricity', coverage: 'Plateau, Bauchi, Benue, Gombe' },
+    { code: 'KAEDCO', name: 'Kaduna Electric', coverage: 'Kaduna, Kebbi, Sokoto, Zamfara' },
+    { code: 'BEDC', name: 'Benin Electricity', coverage: 'Edo, Delta, Ondo, Ekiti' },
+    { code: 'YEDC', name: 'Yola Electricity', coverage: 'Adamawa, Borno, Taraba, Yobe' },
+    { code: 'ABA', name: 'Aba Power (APLE)', coverage: 'Abia (Aba Ring-fenced Area)' },
+];
 
 export interface ReliabilityProvider {
     vertical: string;

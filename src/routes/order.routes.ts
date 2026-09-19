@@ -43,6 +43,23 @@ export default async function orderRoutes(fastify: FastifyInstance) {
         }
     });
 
+    // Query real-time status of all electricity DISCOs
+    fastify.get('/discos/status', async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const { default: buyPowerService } = await import('@/services/buypower.service');
+            const discos = await buyPowerService.getAllDiscosStatus();
+            return reply.send({
+                success: true,
+                updatedAt: new Date().toISOString(),
+                count: discos.length,
+                discos,
+            });
+        } catch (error: any) {
+            fastify.log.error(error);
+            return reply.status(500).send({ success: false, error: error.message });
+        }
+    });
+
     // Manually retry vending an order
     fastify.post(
         '/:reference/retry-vend',
