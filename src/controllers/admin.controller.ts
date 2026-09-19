@@ -28,7 +28,8 @@ export class AdminController {
 
   async getStats(req: FastifyRequest<any>, reply: FastifyReply) {
     try {
-      const stats = await adminService.getDashboardStats();
+      const monnifyService = (req.server as any).monnifyService;
+      const stats = await adminService.getDashboardStats(monnifyService);
       return reply.send({ success: true, ...stats });
     } catch (error: any) {
       return reply.status(500).send({ success: false, error: error.message });
@@ -120,8 +121,9 @@ export class AdminController {
 
   async getAccountingSummary(req: FastifyRequest<any>, reply: FastifyReply) {
     try {
+      const monnifyService = (req.server as any).monnifyService;
       const query = (req.query || {}) as { startDate?: string; endDate?: string };
-      const result = await adminService.getAccountingSummary(query.startDate, query.endDate);
+      const result = await adminService.getAccountingSummary(query.startDate, query.endDate, monnifyService);
       return reply.send({ success: true, ...result });
     } catch (error: any) {
       return reply.status(500).send({ success: false, error: error.message });
@@ -135,6 +137,50 @@ export class AdminController {
       return reply.send({ success: true, count: rows.length, data: rows });
     } catch (error: any) {
       return reply.status(500).send({ success: false, error: error.message });
+    }
+  }
+
+  async requeryBuyPower(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const params = (req.params || {}) as { reference: string };
+      const result = await adminService.requeryBuyPowerOrder(params.reference);
+      return reply.send(result);
+    } catch (error: any) {
+      return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
+    }
+  }
+
+  async verifyMonnifyPayment(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const params = (req.params || {}) as { reference: string };
+      const monnifyService = (req.server as any).monnifyService;
+      const result = await adminService.verifyMonnifyPayment(params.reference, monnifyService);
+      return reply.send(result);
+    } catch (error: any) {
+      return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
+    }
+  }
+
+  async refundOrder(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const params = (req.params || {}) as { reference: string };
+      const body = (req.body || {}) as { reason?: string };
+      const monnifyService = (req.server as any).monnifyService;
+      const result = await adminService.initiateMonnifyRefund(params.reference, body.reason || 'Customer refund', monnifyService);
+      return reply.send(result);
+    } catch (error: any) {
+      return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
+    }
+  }
+
+  async searchMonnifyTransactions(req: FastifyRequest<any>, reply: FastifyReply) {
+    try {
+      const monnifyService = (req.server as any).monnifyService;
+      const query = (req.query || {}) as any;
+      const result = await adminService.getMonnifyTransactions(query, monnifyService);
+      return reply.send({ success: true, result });
+    } catch (error: any) {
+      return reply.status(error.statusCode || 500).send({ success: false, error: error.message });
     }
   }
 

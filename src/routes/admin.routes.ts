@@ -39,6 +39,26 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     adminController.resendToken.bind(adminController)
   );
 
+  // Live Provider Telemetry: BuyPower Re-query & Monnify Payment Verification
+  fastify.get(
+    '/orders/:reference/buypower-requery',
+    { preHandler: [requirePermission('manage_orders')] },
+    adminController.requeryBuyPower.bind(adminController)
+  );
+
+  fastify.get(
+    '/orders/:reference/monnify-verify',
+    { preHandler: [requirePermission('view_orders')] },
+    adminController.verifyMonnifyPayment.bind(adminController)
+  );
+
+  // Automated Refund through Monnify Gateway (Superadmin / Accounting / Orders Management)
+  fastify.post(
+    '/orders/:reference/refund',
+    { preHandler: [requirePermission('manage_orders')] },
+    adminController.refundOrder.bind(adminController)
+  );
+
   // Accounting & Financial Reconciliation
   fastify.get(
     '/accounting/summary',
@@ -50,6 +70,12 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     '/accounting/export',
     { preHandler: [requirePermission('view_accounting')] },
     adminController.exportAccounting.bind(adminController)
+  );
+
+  fastify.get(
+    '/accounting/monnify-transactions',
+    { preHandler: [requirePermission('view_accounting')] },
+    adminController.searchMonnifyTransactions.bind(adminController)
   );
 
   // Customer & Saved Meters Registry

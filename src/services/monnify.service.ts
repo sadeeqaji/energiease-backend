@@ -385,4 +385,93 @@ export class MonnifyService {
     async refreshBanks(): Promise<Bank[]> {
         return this.getBanks(true);
     }
+
+    /**
+     * Query transaction details directly from Monnify API by paymentReference
+     * Returns exact fee, amount paid, settlement amount, and payment status
+     */
+    async queryTransaction(paymentReference: string) {
+        try {
+            const response = await this._request(
+                'GET',
+                `/api/v2/merchant/transactions/query?paymentReference=${encodeURIComponent(paymentReference)}`
+            );
+            return response.data.responseBody;
+        } catch (error: any) {
+            this.fastify.log.error('[Monnify] Query transaction failed:', error?.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Get merchant wallet / disbursement balance from Monnify
+     */
+    async getWalletBalance() {
+        try {
+            const response = await this._request(
+                'GET',
+                '/api/v1/disbursements/wallet/balance'
+            );
+            return response.data.responseBody;
+        } catch (error: any) {
+            this.fastify.log.error('[Monnify] Failed to fetch wallet balance:', error?.message);
+            return { availableBalance: 0, ledgerBalance: 0 };
+        }
+    }
+
+    /**
+     * Search transactions across date ranges and status for financial reconciliation
+     */
+    async searchTransactions(params: {
+        pageNo?: number;
+        pageSize?: number;
+        fromDate?: string;
+        toDate?: string;
+        paymentStatus?: string;
+    }) {
+        try {
+            const query = new URLSearchParams();
+            if (params.pageNo) query.set('pageNo', params.pageNo.toString());
+            if (params.pageSize) query.set('pageSize', params.pageSize.toString());
+            if (params.fromDate) query.set('fromDate', params.fromDate);
+            if (params.toDate) query.set('toDate', params.toDate);
+            if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
+
+            const response = await this._request(
+                'GET',
+                `/api/v1/merchant/transactions/search?${query.toString()}`
+            );
+            return response.data.responseBody;
+        } catch (error: any) {
+            this.fastify.log.error('[Monnify] Search transactions failed:', error?.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Initiate automated refund directly through Monnify
+     */
+    async initiateRefund(params: {
+        transactionReference: string;
+        refundAmount: number;
+        refundReason: string;
+        customerNote?: string;
+    }) {
+        try {
+            const response = await this._request(
+                'POST',
+                '/api/v1/refunds/initiate-refund',
+                {
+                    transactionReference: params.transactionReference,
+                    refundAmount: params.refundAmount,
+                    refundReason: params.refundReason,
+                    customerNote: params.customerNote || 'EnergiEase automatic refund for unfulfilled electricity vend',
+                }
+            );
+            return response.data.responseBody;
+        } catch (error: any) {
+            this.fastify.log.error('[Monnify] Refund initiation failed:', error?.message);
+            throw error;
+        }
+    }
 }

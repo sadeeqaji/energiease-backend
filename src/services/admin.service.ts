@@ -16,7 +16,7 @@ export class AdminService {
   /**
    * Get high-level executive dashboard statistics
    */
-  async getDashboardStats() {
+  async getDashboardStats(monnifyService?: any) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -27,6 +27,7 @@ export class AdminService {
       interventionOrdersCount,
       todayOrders,
       walletData,
+      monnifyWalletData,
     ] = await Promise.all([
       OrderModel.countDocuments(),
       OrderModel.find({ status: 'success' }).lean(),
@@ -37,6 +38,7 @@ export class AdminService {
         console.error('Failed to get wallet balance in admin stats:', err?.message);
         return { balance: 0, commission: 0 };
       }),
+      monnifyService ? monnifyService.getWalletBalance().catch(() => ({ availableBalance: 0, ledgerBalance: 0 })) : Promise.resolve({ availableBalance: 0, ledgerBalance: 0 }),
     ]);
 
     // Financial totals across all successful transactions
@@ -107,6 +109,11 @@ export class AdminService {
         balance: Number(walletData.balance) || 0,
         commissionBalance: Number(walletData.commission) || 0,
         status: (Number(walletData.balance) || 0) < 50000 ? 'CRITICAL' : (Number(walletData.balance) || 0) < 100000 ? 'WARNING' : 'HEALTHY',
+      },
+      monnifyWallet: {
+        provider: 'monnify',
+        availableBalance: Number(monnifyWalletData?.availableBalance) || 0,
+        ledgerBalance: Number(monnifyWalletData?.ledgerBalance) || 0,
       },
     };
   }
@@ -388,9 +395,184 @@ export class AdminService {
   }
 
   /**
+   * Live Re-query transaction status directly from BuyPower API
+   * If BuyPower reports a token/success, update order in DB & notify customer!
+   */
+  async requeryBuyPowerOrder(reference: string) {
+    const order = await OrderModel.findOne({ reference });
+    if (!order) {
+      throw AppException.NotFound(`Order not found with reference: ${reference}`);
+    }
+
+    const orderIdToQuery = order.providerOrderId || order.reference;
+    let bpResponse: any = null;
+
+    try {
+      bpResponse = await buyPowerService.requeryTransaction(orderIdToQuery);
+    } catch (err: any) {
+      if (order.providerOrderId && order.providerOrderId !== order.reference) {
+        try {
+          bpResponse = await buyPowerService.requeryTransaction(order.reference);
+        } catch (e: any) {
+          throw AppException.BadRequest(`BuyPower re-query failed: ${err.message}`);
+        }
+      } else {
+        throw AppException.BadRequest(`BuyPower re-query failed: ${err.message}`);
+      }
+    }
+
+    const resultData = bpResponse?.result?.data || bpResponse?.data || bpResponse;
+    const token = resultData?.token || resultData?.parcels?.[0]?.content;
+    const units = resultData?.units;
+    const receiptNo = resultData?.receiptNo;
+
+    let updated = false;
+
+    if (token && order.status !== 'success') {
+      order.status = 'success';
+      order.requiresManualIntervention = false;
+      order.provider = 'buypower';
+      if (order.details) {
+        (order.details as any).token = token;
+        if (units) (order.details as any).units = units;
+        if (receiptNo) (order.details as any).receiptNo = receiptNo;
+      }
+      order.providerResponse = {
+        ...(order.providerResponse || {}),
+        ...resultData,
+      };
+      await order.save();
+      updated = true;
+
+      if (order.customerPhone) {
+        try {
+          const details = (order.details || {}) as any;
+          const message = ELECTRICITY_PURCHASE_CONFIRMATION({
+            to: order.customerPhone,
+            amount: String(order.amount),
+            meterNumber: details.meterNumber || 'N/A',
+            disco: details.disco || 'N/A',
+            token,
+            unit: units || details.units || '0',
+            orderReference: order.reference,
+          });
+          await this.whatsappService.sendMessage(message as Record<string, unknown>);
+        } catch (msgErr) {
+          console.error('[AdminService] Failed to send WhatsApp after requery:', msgErr);
+        }
+      }
+    } else if (resultData) {
+      order.providerResponse = {
+        ...(order.providerResponse || {}),
+        ...resultData,
+      };
+      await order.save();
+    }
+
+    return {
+      success: true,
+      updated,
+      orderStatus: order.status,
+      buypowerData: resultData,
+      token: token || null,
+      message: updated 
+        ? `BuyPower fulfilled transaction! Token ${token} synced and order marked as Success.`
+        : (resultData?.responseMessage || 'BuyPower returned current order telemetry.'),
+    };
+  }
+
+  /**
+   * Live Payment Verification directly from Monnify API
+   */
+  async verifyMonnifyPayment(reference: string, monnifyService: any) {
+    const order = await OrderModel.findOne({ reference });
+    if (!order) {
+      throw AppException.NotFound(`Order not found with reference: ${reference}`);
+    }
+
+    if (!monnifyService) {
+      throw AppException.InternalServerError('Monnify service is not configured');
+    }
+
+    const monnifyData = await monnifyService.queryTransaction(reference);
+
+    let updated = false;
+    if (monnifyData?.paymentStatus === 'PAID' && order.status === 'pending_payment') {
+      order.paymentConfirmedAt = new Date(monnifyData.paidOn || Date.now());
+      order.status = 'processing';
+      await order.save();
+      updated = true;
+    }
+
+    return {
+      success: true,
+      updated,
+      orderStatus: order.status,
+      monnify: {
+        paymentReference: monnifyData?.paymentReference,
+        transactionReference: monnifyData?.transactionReference,
+        amountPaid: monnifyData?.amountPaid,
+        payableAmount: monnifyData?.payableAmount,
+        paymentStatus: monnifyData?.paymentStatus,
+        paymentMethod: monnifyData?.paymentMethod,
+        fee: monnifyData?.fee,
+        settlementAmount: monnifyData?.settlementAmount,
+        paidOn: monnifyData?.paidOn,
+      },
+      message: `Monnify reports payment status: ${monnifyData?.paymentStatus || 'UNKNOWN'}`,
+    };
+  }
+
+  /**
+   * Initiate customer refund through Monnify
+   */
+  async initiateMonnifyRefund(reference: string, reason: string, monnifyService: any) {
+    const order = await OrderModel.findOne({ reference });
+    if (!order) {
+      throw AppException.NotFound(`Order not found with reference: ${reference}`);
+    }
+
+    if (!monnifyService) {
+      throw AppException.InternalServerError('Monnify service is not configured');
+    }
+
+    const monnifyData = await monnifyService.queryTransaction(reference);
+    if (!monnifyData?.transactionReference) {
+      throw AppException.BadRequest('Cannot refund order: No Monnify transaction reference found');
+    }
+
+    const refundRes = await monnifyService.initiateRefund({
+      transactionReference: monnifyData.transactionReference,
+      refundAmount: order.amount,
+      refundReason: reason || 'Customer refund requested for unfulfilled electricity order',
+    });
+
+    order.fulfillmentFailureReason = `Refunded: ${reason || 'Unfulfilled order'}`;
+    order.status = 'failed';
+    order.requiresManualIntervention = false;
+    await order.save();
+
+    return {
+      success: true,
+      message: 'Refund successfully initiated with Monnify',
+      refundData: refundRes,
+    };
+  }
+
+  /**
+   * Search transactions across Monnify gateway for auditing
+   */
+  async getMonnifyTransactions(params: any, monnifyService: any) {
+    if (!monnifyService) {
+      throw AppException.InternalServerError('Monnify service is not configured');
+    }
+    return monnifyService.searchTransactions(params);
+  }
+
+  /**
    * Accounting and Financial Reconciliation Summary
    */
-  async getAccountingSummary(startDate?: string, endDate?: string) {
+  async getAccountingSummary(startDate?: string, endDate?: string, monnifyService?: any) {
     const filter: Record<string, any> = { status: 'success' };
     if (startDate || endDate) {
       filter.createdAt = {};
@@ -402,9 +584,10 @@ export class AdminService {
       }
     }
 
-    const [orders, walletData] = await Promise.all([
+    const [orders, walletData, monnifyWalletData] = await Promise.all([
       OrderModel.find(filter).sort({ createdAt: -1 }).lean(),
       buyPowerService.getWalletBalance().catch(() => ({ balance: 0, commission: 0 })),
+      monnifyService ? monnifyService.getWalletBalance().catch(() => ({ availableBalance: 0, ledgerBalance: 0 })) : Promise.resolve({ availableBalance: 0, ledgerBalance: 0 }),
     ]);
 
     let totalCustomerPaid = 0;
@@ -476,6 +659,10 @@ export class AdminService {
       buypowerWallet: {
         balance: Number(walletData.balance) || 0,
         commissionBalance: Number(walletData.commission) || 0,
+      },
+      monnifyWallet: {
+        availableBalance: Number(monnifyWalletData?.availableBalance) || 0,
+        ledgerBalance: Number(monnifyWalletData?.ledgerBalance) || 0,
       },
       ledger: Object.values(dailyLedger).map(row => ({
         ...row,

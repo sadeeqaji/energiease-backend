@@ -90,6 +90,55 @@ export class BuyPowerService {
         }
     }
 
+    /**
+     * Re-query transaction state directly from BuyPower API using orderId
+     */
+    async requeryTransaction(orderId: string) {
+        try {
+            const response = await axios.get(`${BuyPowerConfig.baseUrl}/transaction/${encodeURIComponent(orderId)}`, {
+                headers: {
+                    Authorization: `Bearer ${BuyPowerConfig.apiKey}`,
+                    Accept: 'application/json',
+                },
+                timeout: 15000,
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[BuyPower] Re-query error:', error.response?.data || error.message);
+            if (axios.isAxiosError(error)) {
+                throw AppException.InternalServerError(
+                    error.response?.data?.message || 'BuyPower re-query request failed',
+                    { status: error.response?.status }
+                );
+            }
+            throw AppException.InternalServerError('BuyPower re-query request failed');
+        }
+    }
+
+    /**
+     * Get historical transactions from BuyPower
+     */
+    async getTransactions(params?: { limit?: number; start?: string; end?: string }) {
+        try {
+            const response = await axios.get(`${BuyPowerConfig.baseUrl}/transactions`, {
+                params: {
+                    limit: params?.limit || 50,
+                    start: params?.start,
+                    end: params?.end,
+                },
+                headers: {
+                    Authorization: `Bearer ${BuyPowerConfig.apiKey}`,
+                    Accept: 'application/json',
+                },
+                timeout: 15000,
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[BuyPower] Failed to fetch transactions:', error.response?.data || error.message);
+            return null;
+        }
+    }
+
     private reliabilityCache: { data: ReliabilityProvider[]; timestamp: number } | null = null;
     private readonly RELIABILITY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes in-memory cache
 
