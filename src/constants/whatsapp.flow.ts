@@ -88,7 +88,7 @@ export const GET_STARTED = (to: string) => ({
       text: 'Hi there! 👋 You’re just a few taps away from seamless electricity purchase.',
     },
     footer: {
-      text: 'Tap below to get started. Quick & easy! ⚡',
+      text: 'Need help? Reply SUPPORT • Quick & easy! ⚡',
     },
     action: {
       name: 'flow',
@@ -432,5 +432,35 @@ Thank you for choosing Energiease!
 
 Need help? Reply to this message or contact us:
 📞 07067307317`,
+  },
+});
+
+export const SUPPORT_WELCOME_MESSAGE = (to: string, ticketId: string) => ({
+  messaging_product: 'whatsapp',
+  recipient_type: 'individual',
+  to,
+  type: 'text',
+  text: {
+    body: `🎧 *EnergiEase Customer Care*\n\nYour support ticket (*#${ticketId}*) is active. A support agent has been notified and will respond shortly.\n\nPlease describe your issue or share your meter number below.\n\n_Tip: Reply *EXIT* at any time to return to the vending menu._`,
+  },
+});
+
+export const SUPPORT_AGENT_REPLY_MESSAGE = (to: string, agentName: string, text: string) => ({
+  messaging_product: 'whatsapp',
+  recipient_type: 'individual',
+  to,
+  type: 'text',
+  text: {
+    body: `👨‍💼 *Support Agent (${agentName})*:\n\n${text}\n\n_Reply to this message to continue chatting with support._`,
+  },
+});
+
+export const SUPPORT_RESOLVED_MESSAGE = (to: string, ticketId: string) => ({
+  messaging_product: 'whatsapp',
+  recipient_type: 'individual',
+  to,
+  type: 'text',
+  text: {
+    body: `✅ *Ticket #${ticketId} Resolved*\n\nYour support session has been completed. Thank you for choosing EnergiEase!\n\nWhenever you're ready to purchase electricity tokens, simply reply *Hi* or tap below! ⚡`,
   },
 });

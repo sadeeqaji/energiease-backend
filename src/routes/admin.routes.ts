@@ -1,8 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import adminController from '@/controllers/admin.controller';
+import { SupportController } from '@/controllers/support.controller';
 import { requirePermission } from '@/middleware/rbac.middleware';
 
 export default async function adminRoutes(fastify: FastifyInstance) {
+  const supportController = new SupportController();
+
   // All admin routes require a valid access token
   fastify.addHook('onRequest', fastify.authenticateAccessToken);
 
@@ -103,4 +106,30 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [requirePermission('manage_admins')] },
     adminController.deleteUser.bind(adminController)
   );
+
+  // Native Customer Support Desk (Live WhatsApp Chat & Diagnostics)
+  fastify.get(
+    '/support/tickets',
+    { preHandler: [requirePermission('view_orders')] },
+    supportController.listTickets.bind(supportController)
+  );
+
+  fastify.get(
+    '/support/tickets/:ticketId',
+    { preHandler: [requirePermission('view_orders')] },
+    supportController.getTicket.bind(supportController)
+  );
+
+  fastify.post(
+    '/support/tickets/:ticketId/reply',
+    { preHandler: [requirePermission('send_tokens')] },
+    supportController.replyTicket.bind(supportController)
+  );
+
+  fastify.patch(
+    '/support/tickets/:ticketId/resolve',
+    { preHandler: [requirePermission('manage_orders')] },
+    supportController.resolveTicket.bind(supportController)
+  );
 }
+

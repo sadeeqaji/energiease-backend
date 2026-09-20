@@ -18,6 +18,7 @@ import { getSecret } from '@/utils/getSecretFromAzVault';
 import { BillType } from '@/types/bill.types';
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
 import { formatToWhatsAppPhone } from '@/utils/phoneNumber';
+import { SupportService } from '@/services/support.service';
 
 const { META_APP_SECRET, PASSPHRASE } = env;
 
@@ -244,13 +245,54 @@ export class WhatsAppController {
       }
 
       const { from, text } = messageData;
-      const messageText = text?.body || 'No text';
+      const messageText = (text?.body || '').trim();
+      const cleanPhone = formatToWhatsAppPhone(from);
       req.log.info(`📩 Received message: "${messageText}" from ${from}`);
 
       // Track active user phone in Redis for flow fallback
       req.server.redis.set('user:phone:session:latest', from, { ttl: 3600 }).catch(() => {});
 
       reply.status(200).send({ status: 'Message received' });
+
+      // 1. Check if user is in an active support session or requesting support
+      const inSupportSession = await req.server.redis.get(`support_session:${cleanPhone}`).catch(() => null);
+      const isExitKeyword = /^(exit|quit|cancel|buy|vend|menu|restart)$/i.test(messageText);
+      const isSupportKeyword =
+        /^(support|help|agent|issue|complaint|talk to human|problem|error|chat with support)$/i.test(messageText) ||
+        messageText.toLowerCase().includes('support') ||
+        messageText.toLowerCase().includes('talk to agent') ||
+        messageText.toLowerCase().includes('customer care');
+
+      if (inSupportSession && isExitKeyword) {
+        // User wants to exit support session back to vending
+        await req.server.redis.del(`support_session:${cleanPhone}`).catch(() => {});
+        await this.fastify.whatsappService
+          .sendMessage({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: from,
+            type: 'text',
+            text: { body: '🚪 *Support Session Closed*\n\nReturning you to the main vending menu...' },
+          } as any)
+          .catch(() => {});
+        await this.fastify.whatsappService.sendMessage(GET_STARTED(from)).catch(() => {});
+        return;
+      }
+
+      if (inSupportSession || isSupportKeyword) {
+        // Maintain support session in Redis (TTL 24 hours)
+        await req.server.redis.set(`support_session:${cleanPhone}`, '1', { ttl: 86400 }).catch(() => {});
+
+        const supportService = new SupportService(this.fastify);
+        await supportService.handleIncomingCustomerMessage(cleanPhone, messageText).catch((err) => {
+          req.log.error(err, 'Support message handling error');
+        });
+        req.log.info(
+          { cleanPhone, isSupportKeyword, inSupportSession: !!inSupportSession },
+          '🎧 Native support message processed'
+        );
+        return;
+      }
 
       Promise.all([
         this.fastify.userService.getUserByIdentifier(from)
@@ -271,7 +313,7 @@ export class WhatsAppController {
                 recipient_type: 'individual',
                 to: from,
                 type: 'text',
-                text: { body: '⚡ *Welcome to Energiease!*\n\nWe received your message! To enable the interactive Flow screen, please ensure your Flow is Published in WhatsApp Manager and FLOW_ID in .env matches.' }
+                text: { body: '⚡ *Welcome to Energiease!*\n\nWe received your message! To enable the interactive Flow screen, please ensure your Flow is Published in WhatsApp Manager and FLOW_ID in .env matches.\n\nNeed support? Reply SUPPORT anytime.' }
               });
             } catch (fallbackErr: any) {
               req.log.error('Fallback text message error:', fallbackErr.message);
