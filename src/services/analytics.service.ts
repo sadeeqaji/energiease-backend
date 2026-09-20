@@ -10,20 +10,29 @@ class AnalyticsService {
   }
 
   private init() {
+    // Only initialize PostHog in production to prevent polluting production analytics with local testing
+    const isProduction = env.NODE_ENV === 'production';
+    const forceEnabled = process.env.ENABLE_POSTHOG === 'true';
+
+    if (!isProduction && !forceEnabled) {
+      console.log('ℹ️ [Analytics] Local environment detected (NODE_ENV=development). PostHog is disabled.');
+      return;
+    }
+
     if (env.POSTHOG_API_KEY) {
       try {
         this.client = new PostHog(env.POSTHOG_API_KEY, {
           host: env.POSTHOG_HOST || 'https://eu.i.posthog.com',
-          flushAt: 1, // Flush events quickly for low latency in serverless / Node
+          flushAt: 1,
           flushInterval: 2000,
         });
         this.isInitialized = true;
-        console.log('✅ PostHog Analytics initialized successfully with host:', env.POSTHOG_HOST);
+        console.log('✅ PostHog Analytics initialized successfully (Production) with host:', env.POSTHOG_HOST);
       } catch (err) {
         console.warn('⚠️ Failed to initialize PostHog client:', err);
       }
     } else {
-      console.log('ℹ️ PostHog API Key not set. Analytics events will be logged in debug mode.');
+      console.log('ℹ️ PostHog API Key not set.');
     }
   }
 
@@ -32,9 +41,6 @@ class AnalyticsService {
    */
   public capture(distinctId: string, event: string, properties: Record<string, any> = {}) {
     if (!this.client || !this.isInitialized) {
-      if (env.NODE_ENV === 'development') {
-        console.debug(`[Analytics Mock] Event: "${event}" | DistinctId: ${distinctId}`, properties);
-      }
       return;
     }
 
