@@ -10,6 +10,7 @@ import {
   SUPPORT_AUTO_RESOLVED_MESSAGE,
 } from '@/constants/whatsapp.flow';
 import { formatToWhatsAppPhone, getPhoneSearchVariants } from '@/utils/phoneNumber';
+import { analytics } from '@/services/analytics.service';
 
 export class SupportService {
   private whatsappService: WhatsAppService;
@@ -48,6 +49,7 @@ export class SupportService {
     if (!ticket) {
       isNew = true;
       const ticketId = this.generateTicketId();
+      analytics.trackSupportTicketOpened(cleanPhone, ticketId, 'customer_inquiry');
 
       // Retrieve customer context (last meter and order)
       let meterNo: string | undefined;
@@ -313,6 +315,8 @@ export class SupportService {
     ticket.inactivityWarningSentAt = undefined;
     await ticket.save();
 
+    analytics.trackSupportReplySent(ticket.ticketId, 'agent', ticket.customerPhone);
+
     // Send outgoing WhatsApp message to customer
     try {
       await this.whatsappService.sendMessage(
@@ -348,6 +352,11 @@ export class SupportService {
     });
     ticket.lastMessageAt = new Date();
     await ticket.save();
+
+    const totalDurationMins = ticket.createdAt
+      ? Math.round((Date.now() - new Date(ticket.createdAt).getTime()) / 60000)
+      : undefined;
+    analytics.trackSupportTicketResolved(ticket.customerPhone, ticket.ticketId, resolutionReason, totalDurationMins);
 
     // Release Redis session if Redis is available
     if (this.fastify?.redis) {

@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { MonnifyEvent, SuccessfulTransactionEvent } from '@/types/monnify.types';
 import { REDIS_PREFIXES } from '@/constants/redisPrefix';
 import { PAYMENT_RECEIVED } from '@/constants/whatsapp.flow';
+import { analytics } from '@/services/analytics.service';
 
 export class MonnifyWebhookController {
     private readonly MONNIFY_IPS = ['35.242.133.146'];
@@ -77,6 +78,15 @@ export class MonnifyWebhookController {
                 this.fastify.log.error(`Order not found for reference: ${paymentReference}`);
                 return;
             }
+
+            analytics.trackPaymentReceived(
+                order.customerPhone,
+                paymentReference,
+                amountPaid,
+                'monnify',
+                (event.eventData as any)?.fee
+            );
+
             this.sendPaymentReceivedNotification(order.customerPhone, amountPaid, paymentReference)
                 .catch(err => {
                     this.fastify.log.error(`Failed to send WhatsApp notification:`, err);

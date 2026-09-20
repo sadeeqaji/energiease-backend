@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { BuyPowerConfig } from '@/config/buypower.config';
 import { AppException } from '@/utils/appException.utils';
+import { analytics } from './analytics.service';
 
 export class BuyPowerService {
     async checkMeter(
@@ -9,6 +10,7 @@ export class BuyPowerService {
         vendType: string,
     ) {
         console.log('[BuyPower] Starting meter check:', { meterNo, disco, vendType });
+        const startTime = performance.now();
 
         try {
             const response = await axios.get(`${BuyPowerConfig.baseUrl}/check/meter`, {
@@ -26,9 +28,31 @@ export class BuyPowerService {
                 timeout: 15000
             });
 
+            const durationMs = Math.round(performance.now() - startTime);
+            analytics.trackMeterValidation(
+                meterNo,
+                disco,
+                meterNo,
+                true,
+                durationMs,
+                { meterType: vendType }
+            );
+
             return response.data;
 
-        } catch (error) {
+        } catch (error: any) {
+            const durationMs = Math.round(performance.now() - startTime);
+            analytics.trackMeterValidation(
+                meterNo,
+                disco,
+                meterNo,
+                false,
+                durationMs,
+                {
+                    meterType: vendType,
+                    error: error?.response?.data?.message || error?.message || 'Meter check failed',
+                }
+            );
 
             if (axios.isAxiosError(error)) {
                 console.error('[BuyPower] Error Details:', {

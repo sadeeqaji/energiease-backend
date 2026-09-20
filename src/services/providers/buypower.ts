@@ -7,6 +7,7 @@ import { ELECTRICITY_PURCHASE_CONFIRMATION } from '@/constants/whatsapp.flow';
 import { formatNigerianPhoneNumber } from '@/utils/phoneNumber';
 
 import receiptService from '../receipt.service';
+import { analytics } from '../analytics.service';
 
 const whatsappService = new WhatsAppService();
 
@@ -19,14 +20,33 @@ export class BuyPowerProvider implements BillProvider {
         if (billType !== 'electricity') {
             throw AppException.BadRequest('BuyPower only supports electricity bills');
         }
-        details.amount = amount
-        details.reference = orderReference
+        details.amount = amount;
+        details.reference = orderReference;
+        const startTime = performance.now();
+
         try {
             const { data } = await axios.post(
                 `${BuyPowerConfig.baseUrl}/vend?strict=0`,
                 this.createElectricityPayload(details, userInfo),
                 { headers: { Authorization: `Bearer ${BuyPowerConfig.apiKey}` } }
             );
+
+            const durationMs = Math.round(performance.now() - startTime);
+
+            // Track vending latency and success in PostHog
+            analytics.trackTokenVend(
+                userInfo.phone,
+                orderReference,
+                data.data.disco || details.disco,
+                'success',
+                durationMs,
+                {
+                    amount: data.data.totalAmountPaid || amount,
+                    units: data.data.units,
+                    provider: 'BuyPower',
+                }
+            );
+
             await whatsappService.sendMessage(ELECTRICITY_PURCHASE_CONFIRMATION(
                 {
                     amount: data.data.totalAmountPaid,
@@ -75,7 +95,26 @@ export class BuyPowerProvider implements BillProvider {
                 raw: data.data,
             };
 
-        } catch (error) {
+        } catch (error: any) {
+            const durationMs = Math.round(performance.now() - startTime);
+            const failureReason = axios.isAxiosError(error)
+                ? (error.response?.data?.message || error.message)
+                : error?.message || 'Vending failed';
+
+            // Track vending failure with latency in PostHog
+            analytics.trackTokenVend(
+                userInfo.phone,
+                orderReference,
+                details.disco || 'UNKNOWN',
+                'failed',
+                durationMs,
+                {
+                    amount,
+                    failureReason,
+                    provider: 'BuyPower',
+                }
+            );
+
             this.handleVendError(error);
         }
     }

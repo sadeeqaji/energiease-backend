@@ -31,7 +31,9 @@ const env = cleanEnv(process.env, {
   JWT_SECRET: str({ default: 'energiease-jwt-secret-key-change-in-prod' }),
   BUYPOWER_MFB_BASE_URL: str({ default: 'https://api.buypowermfb.net' }),
   BUYPOWER_MFB_API_KEY: str({ default: undefined }),
-  BUYPOWER_MFB_WEBHOOK_SECRET: str({ default: undefined })
+  BUYPOWER_MFB_WEBHOOK_SECRET: str({ default: undefined }),
+  POSTHOG_API_KEY: str({ default: undefined }),
+  POSTHOG_HOST: str({ default: 'https://eu.i.posthog.com' }),
 });
 
 export default env;
