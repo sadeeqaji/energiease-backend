@@ -1,5 +1,7 @@
 import { PostHog } from 'posthog-node';
 import env from '@/config/env';
+import Order from '@/models/order.model';
+import { formatToWhatsAppPhone, getPhoneSearchVariants } from '@/utils/phoneNumber';
 
 class AnalyticsService {
   private client: PostHog | null = null;
@@ -130,6 +132,60 @@ class AnalyticsService {
   }
 
   // ==========================================
+  // CUSTOMER RETENTION & LTV (COHORTS & FREQUENCY)
+  // ==========================================
+
+  /**
+   * Evaluates customer purchase history to determine retention, order count, and churn intervals
+   */
+  public async getCustomerRetentionMetrics(phone: string): Promise<{
+    is_returning_customer: boolean;
+    customer_total_orders: number;
+    days_since_last_order: number | null;
+    customer_cohort: 'first_time_buyer' | 'repeat_buyer' | 'power_user';
+  }> {
+    try {
+      const cleanPhone = formatToWhatsAppPhone(phone);
+      const variants = getPhoneSearchVariants(cleanPhone);
+
+      const pastOrders = await Order.find({
+        customerPhone: { $in: variants },
+        status: 'success',
+      })
+        .sort({ createdAt: -1 })
+        .select('createdAt amount')
+        .lean();
+
+      const count = pastOrders.length;
+      const isReturning = count > 0;
+
+      let daysSinceLast: number | null = null;
+      if (count > 0 && pastOrders[0].createdAt) {
+        const diffMs = Date.now() - new Date(pastOrders[0].createdAt).getTime();
+        daysSinceLast = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      }
+
+      let cohort: 'first_time_buyer' | 'repeat_buyer' | 'power_user' = 'first_time_buyer';
+      if (count >= 4) cohort = 'power_user';
+      else if (count >= 1) cohort = 'repeat_buyer';
+
+      return {
+        is_returning_customer: isReturning,
+        customer_total_orders: count + 1, // current purchase included
+        days_since_last_order: daysSinceLast,
+        customer_cohort: cohort,
+      };
+    } catch (e) {
+      return {
+        is_returning_customer: false,
+        customer_total_orders: 1,
+        days_since_last_order: null,
+        customer_cohort: 'first_time_buyer',
+      };
+    }
+  }
+
+  // ==========================================
   // PAYMENT & ORDER EVENTS
   // ==========================================
 
@@ -153,13 +209,20 @@ class AnalyticsService {
     orderRef: string,
     amount: number,
     gateway: string,
-    gatewayFee?: number
+    gatewayFee?: number,
+    retention?: {
+      is_returning_customer?: boolean;
+      customer_total_orders?: number;
+      days_since_last_order?: number | null;
+      customer_cohort?: string;
+    }
   ) {
     this.capture(phone, 'payment_completed', {
       order_reference: orderRef,
       amount,
       gateway,
       gateway_fee: gatewayFee,
+      ...retention,
     });
   }
 
@@ -179,6 +242,10 @@ class AnalyticsService {
       tokenLength?: number;
       failureReason?: string;
       provider?: string;
+      is_returning_customer?: boolean;
+      customer_total_orders?: number;
+      days_since_last_order?: number | null;
+      customer_cohort?: string;
     }
   ) {
     this.capture(phone, 'token_vended', {
@@ -192,6 +259,37 @@ class AnalyticsService {
       units: details?.units,
       token_generated: status === 'success',
       failure_reason: details?.failureReason,
+      is_returning_customer: details?.is_returning_customer,
+      customer_total_orders: details?.customer_total_orders,
+      days_since_last_order: details?.days_since_last_order,
+      customer_cohort: details?.customer_cohort,
+    });
+  }
+
+  /**
+   * CRITICAL ALERT: Token was generated, but Meta WhatsApp message failed delivery
+   */
+  public trackWhatsAppDeliveryFailed(
+    phone: string,
+    orderRef: string,
+    token: string,
+    errorCode: string | number,
+    errorMessage: string,
+    metadata?: {
+      disco?: string;
+      amount?: number;
+      units?: number;
+    }
+  ) {
+    this.capture(phone, 'whatsapp_delivery_failed', {
+      order_reference: orderRef,
+      token_masked: token.length > 4 ? `****${token.slice(-4)}` : token,
+      meta_error_code: String(errorCode),
+      meta_error_message: errorMessage,
+      disco: metadata?.disco?.toUpperCase(),
+      amount: metadata?.amount,
+      units: metadata?.units,
+      requires_immediate_agent_call: true,
     });
   }
 

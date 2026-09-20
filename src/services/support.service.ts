@@ -378,6 +378,50 @@ export class SupportService {
   }
 
   /**
+   * Automatically creates or escalates an urgent support ticket when a token was vended
+   * but Meta WhatsApp delivery failed, so human agents can intervene immediately.
+   */
+  async createUrgentDeliveryFailureTicket(params: {
+    phone: string;
+    orderReference: string;
+    token: string;
+    disco: string;
+    meterNumber: string;
+    amount: number;
+    errorCode: string | number;
+    errorMessage: string;
+  }) {
+    const cleanPhone = formatToWhatsAppPhone(params.phone);
+    const ticketId = this.generateTicketId();
+
+    const alertMessage =
+      `🚨 URGENT DELIVERY FAILURE: BuyPower successfully vended Token (${params.token}) for Order #${params.orderReference} ` +
+      `(₦${params.amount.toLocaleString()} • ${params.disco} • Meter: ${params.meterNumber}), ` +
+      `BUT Meta WhatsApp message delivery failed [Error ${params.errorCode}]: ${params.errorMessage}. ` +
+      `Please contact the customer immediately via phone call or SMS with their token!`;
+
+    const ticket = await SupportTicket.create({
+      ticketId,
+      customerPhone: cleanPhone,
+      status: 'pending_agent',
+      meterNo: params.meterNumber,
+      disco: params.disco,
+      lastOrderRef: params.orderReference,
+      messages: [
+        {
+          sender: 'system',
+          senderName: 'Meta Delivery Monitor',
+          text: alertMessage,
+          timestamp: new Date(),
+        },
+      ],
+      lastMessageAt: new Date(),
+    });
+
+    return ticket;
+  }
+
+  /**
    * Scans tickets waiting for customer responses and executes the 15-minute inactivity policy:
    *  - 10 minutes of silence: sends friendly WhatsApp check-in nudge
    *  - 15 minutes of silence: auto-resolves ticket, releases Redis session, and sends closure notification
