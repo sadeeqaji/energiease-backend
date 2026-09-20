@@ -7,6 +7,7 @@ import buyPowerService from './buypower.service';
 import { WhatsAppService } from './whatsapp.service';
 import { ELECTRICITY_PURCHASE_CONFIRMATION } from '@/constants/whatsapp.flow';
 import { AppException } from '@/utils/appException.utils';
+import { getPhoneSearchVariants } from '@/utils/phoneNumber';
 
 export class AdminService {
   private whatsappService: WhatsAppService;
@@ -245,9 +246,14 @@ export class AdminService {
 
     if (query.search && query.search.trim()) {
       const term = query.search.trim();
+      const phoneVariants = getPhoneSearchVariants(term);
+      const digitsOnly = term.replace(/[^0-9]/g, '');
+
       filter.$or = [
         { reference: { $regex: term, $options: 'i' } },
         { customerPhone: { $regex: term, $options: 'i' } },
+        { customerPhone: { $in: phoneVariants } },
+        ...(digitsOnly.length >= 9 ? [{ customerPhone: new RegExp(`${digitsOnly.slice(-9)}$`) }] : []),
         { 'details.meterNumber': { $regex: term, $options: 'i' } },
         { providerOrderId: { $regex: term, $options: 'i' } },
       ];

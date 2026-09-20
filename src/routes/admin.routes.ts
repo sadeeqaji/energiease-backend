@@ -131,5 +131,11 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [requirePermission('manage_orders')] },
     supportController.resolveTicket.bind(supportController)
   );
+
+  fastify.get(
+    '/support/orders-by-phone',
+    { preHandler: [requirePermission('view_orders')] },
+    supportController.getOrdersByPhone.bind(supportController)
+  );
 }
 

@@ -92,4 +92,22 @@ export class SupportController {
       return reply.status(500).send({ success: false, error: error.message });
     }
   }
+
+  async getOrdersByPhone(req: FastifyRequest<any>, reply: FastifyReply) {
+    const query = (req.query || {}) as { phone?: string; meterNo?: string; limit?: string };
+    try {
+      const phone = query.phone || '';
+      const meterNo = query.meterNo || '';
+      if (!phone && !meterNo) {
+        return reply.status(400).send({ success: false, error: 'Phone number or meter number is required' });
+      }
+
+      const limit = query.limit ? Number(query.limit) : 20;
+      const orders = await this.supportService.fetchOrdersByPhoneOrMeter(phone, meterNo, limit);
+      return reply.send({ success: true, count: orders.length, orders });
+    } catch (error: any) {
+      req.log.error(error, 'Error fetching orders by phone');
+      return reply.status(500).send({ success: false, error: error.message });
+    }
+  }
 }

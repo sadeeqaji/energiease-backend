@@ -9,7 +9,7 @@ import {
   SUPPORT_INACTIVITY_NUDGE_MESSAGE,
   SUPPORT_AUTO_RESOLVED_MESSAGE,
 } from '@/constants/whatsapp.flow';
-import { formatToWhatsAppPhone } from '@/utils/phoneNumber';
+import { formatToWhatsAppPhone, getPhoneSearchVariants } from '@/utils/phoneNumber';
 
 export class SupportService {
   private whatsappService: WhatsAppService;
@@ -197,6 +197,65 @@ export class SupportService {
   }
 
   /**
+   * Fetches customer orders matching a phone number (any Nigerian format) and/or meter number
+   */
+  async fetchOrdersByPhoneOrMeter(phone?: string, meterNo?: string, limit = 15) {
+    const orConditions: any[] = [];
+
+    if (phone && phone.trim()) {
+      const trimmedPhone = phone.trim();
+      const variants = getPhoneSearchVariants(trimmedPhone);
+      orConditions.push({ customerPhone: { $in: variants } });
+
+      const digitsOnly = trimmedPhone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length >= 9) {
+        const last9 = digitsOnly.slice(-9);
+        orConditions.push({ customerPhone: new RegExp(`${last9}$`) });
+      }
+    }
+
+    if (meterNo && meterNo.trim()) {
+      const trimmedMeter = meterNo.trim();
+      orConditions.push({ 'details.meterNumber': trimmedMeter });
+      orConditions.push({ 'details.meterNumber': new RegExp(trimmedMeter, 'i') });
+    }
+
+    if (orConditions.length === 0) {
+      return [];
+    }
+
+    const orders = await Order.find({ $or: orConditions })
+      .sort({ createdAt: -1 })
+      .limit(Math.min(limit, 50))
+      .lean();
+
+    return orders.map((o: any) => {
+      const d = (o.details || {}) as any;
+      const resp = (o.providerResponse || {}) as any;
+      const token = resp.token || resp.standardTokenValue || d.token || o.token;
+
+      return {
+        id: String(o._id),
+        reference: o.reference,
+        customerPhone: o.customerPhone,
+        type: o.type,
+        status: o.status,
+        amount: o.amount,
+        serviceFee: o.serviceFee,
+        disco: d.disco || 'UNKNOWN',
+        meterNumber: d.meterNumber || '',
+        token: token || undefined,
+        units: resp.units || d.units || undefined,
+        provider: o.provider,
+        providerOrderId: o.providerOrderId,
+        requiresManualIntervention: o.requiresManualIntervention || false,
+        failureReason: o.failureReason || resp.message || undefined,
+        createdAt: o.createdAt,
+      };
+    });
+  }
+
+  /**
    * Retrieves single ticket with full chat history and related order diagnostics
    */
   async getTicketDetails(ticketId: string) {
@@ -208,13 +267,10 @@ export class SupportService {
       throw new Error(`Ticket ${ticketId} not found`);
     }
 
-    // Fetch up to 5 recent orders for this customer to give full fintech context
+    // Fetch up to 10 recent orders for this customer using multi-format phone lookup
     let recentOrders: any[] = [];
     try {
-      recentOrders = await Order.find({ customerPhone: ticket.customerPhone })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .lean();
+      recentOrders = await this.fetchOrdersByPhoneOrMeter(ticket.customerPhone, ticket.meterNo, 10);
     } catch (err) {
       console.error('[SupportService] Error fetching customer orders:', err);
     }
