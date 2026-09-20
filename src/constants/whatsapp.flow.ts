@@ -464,3 +464,23 @@ export const SUPPORT_RESOLVED_MESSAGE = (to: string, ticketId: string) => ({
     body: `✅ *Ticket #${ticketId} Resolved*\n\nYour support session has been completed. Thank you for choosing EnergiEase!\n\nWhenever you're ready to purchase electricity tokens, simply reply *Hi* or tap below! ⚡`,
   },
 });
+
+export const SUPPORT_INACTIVITY_NUDGE_MESSAGE = (to: string, ticketId: string) => ({
+  messaging_product: 'whatsapp',
+  recipient_type: 'individual',
+  to,
+  type: 'text',
+  text: {
+    body: `👋 *EnergiEase Customer Care*\n\nJust checking in on your inquiry (*#${ticketId}*)! Is everything sorted with your meter/token?\n\nPlease let us know if you still need help, or reply *EXIT* if you're all set! ⚡`,
+  },
+});
+
+export const SUPPORT_AUTO_RESOLVED_MESSAGE = (to: string, ticketId: string) => ({
+  messaging_product: 'whatsapp',
+  recipient_type: 'individual',
+  to,
+  type: 'text',
+  text: {
+    body: `⏳ *Support Session Closed (Inactivity)*\n\nTicket (*#${ticketId}*) has been automatically closed due to inactivity so you can continue purchasing electricity without delay.\n\nWhenever you need to buy tokens or contact us again, simply reply *Hi*! ⚡`,
+  },
+});

@@ -55,6 +55,11 @@ const start = async () => {
     const { WalletMonitor } = await import('./jobs/walletMonitor.job');
     const walletMonitor = new WalletMonitor(fastify);
     walletMonitor.start();
+
+    // Start Support 15-minute customer inactivity auto-exit monitor
+    const { SupportInactivityMonitor } = await import('./jobs/supportInactivity.job');
+    const inactivityMonitor = new SupportInactivityMonitor(fastify);
+    inactivityMonitor.start();
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

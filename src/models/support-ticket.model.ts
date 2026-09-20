@@ -18,6 +18,8 @@ export interface ISupportTicket extends Document {
   messages: ISupportMessage[];
   assignedTo?: mongoose.Types.ObjectId;
   lastMessageAt: Date;
+  inactivityWarningSentAt?: Date;
+  resolutionReason?: 'agent' | 'customer_exit' | 'inactivity_timeout';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -90,6 +92,13 @@ const SupportTicketSchema = new Schema<ISupportTicket>(
       type: Date,
       default: Date.now,
       index: true,
+    },
+    inactivityWarningSentAt: {
+      type: Date,
+    },
+    resolutionReason: {
+      type: String,
+      enum: ['agent', 'customer_exit', 'inactivity_timeout'],
     },
   },
   {

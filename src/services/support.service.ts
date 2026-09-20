@@ -6,6 +6,8 @@ import {
   SUPPORT_WELCOME_MESSAGE,
   SUPPORT_AGENT_REPLY_MESSAGE,
   SUPPORT_RESOLVED_MESSAGE,
+  SUPPORT_INACTIVITY_NUDGE_MESSAGE,
+  SUPPORT_AUTO_RESOLVED_MESSAGE,
 } from '@/constants/whatsapp.flow';
 import { formatToWhatsAppPhone } from '@/utils/phoneNumber';
 
@@ -106,6 +108,7 @@ export class SupportService {
       });
       ticket.status = 'pending_agent';
       ticket.lastMessageAt = new Date();
+      ticket.inactivityWarningSentAt = undefined;
       await ticket.save();
     }
 
@@ -251,6 +254,7 @@ export class SupportService {
 
     ticket.status = 'pending_customer';
     ticket.lastMessageAt = new Date();
+    ticket.inactivityWarningSentAt = undefined;
     await ticket.save();
 
     // Send outgoing WhatsApp message to customer
@@ -268,17 +272,22 @@ export class SupportService {
   /**
    * Resolves a ticket and releases the customer WhatsApp session back to automated vending
    */
-  async resolveTicket(ticketId: string, agentName?: string) {
+  async resolveTicket(
+    ticketId: string,
+    agentName?: string,
+    resolutionReason: 'agent' | 'customer_exit' | 'inactivity_timeout' = 'agent'
+  ) {
     const ticket = await SupportTicket.findOne({ ticketId });
     if (!ticket) {
       throw new Error(`Ticket ${ticketId} not found`);
     }
 
     ticket.status = 'resolved';
+    ticket.resolutionReason = resolutionReason;
     ticket.messages.push({
       sender: 'system',
       senderName: 'System',
-      text: `Ticket resolved by ${agentName || 'Support Agent'}`,
+      text: `Ticket resolved by ${agentName || 'Support Agent'} (${resolutionReason})`,
       timestamp: new Date(),
     });
     ticket.lastMessageAt = new Date();
@@ -291,11 +300,92 @@ export class SupportService {
 
     // Send closing message to WhatsApp customer
     await this.whatsappService
-      .sendMessage(SUPPORT_RESOLVED_MESSAGE(ticket.customerPhone, ticket.ticketId) as any)
+      .sendMessage(
+        (resolutionReason === 'inactivity_timeout'
+          ? SUPPORT_AUTO_RESOLVED_MESSAGE(ticket.customerPhone, ticket.ticketId)
+          : SUPPORT_RESOLVED_MESSAGE(ticket.customerPhone, ticket.ticketId)) as any
+      )
       .catch((err) => {
         console.error('[SupportService] Failed to send resolution message:', err);
       });
 
     return ticket;
   }
+
+  /**
+   * Scans tickets waiting for customer responses and executes the 15-minute inactivity policy:
+   *  - 10 minutes of silence: sends friendly WhatsApp check-in nudge
+   *  - 15 minutes of silence: auto-resolves ticket, releases Redis session, and sends closure notification
+   */
+  async checkAndHandleInactiveTickets(): Promise<{ nudgedCount: number; autoClosedCount: number }> {
+    const now = Date.now();
+    const NUDGE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
+    const CLOSE_AFTER_MS = 15 * 60 * 1000; // 15 minutes total
+
+    // Only inspect tickets where agent already replied and we are waiting on the customer
+    const candidateTickets = await SupportTicket.find({
+      status: 'pending_customer',
+    });
+
+    let nudgedCount = 0;
+    let autoClosedCount = 0;
+
+    for (const ticket of candidateTickets) {
+      const elapsedSinceLastMsg = now - new Date(ticket.lastMessageAt).getTime();
+
+      // Check if eligible for auto-close (15 mins total silence)
+      if (elapsedSinceLastMsg >= CLOSE_AFTER_MS) {
+        ticket.status = 'resolved';
+        ticket.resolutionReason = 'inactivity_timeout';
+        ticket.messages.push({
+          sender: 'system',
+          senderName: 'System',
+          text: 'Ticket auto-closed due to 15 minutes of customer inactivity.',
+          timestamp: new Date(),
+        });
+        ticket.lastMessageAt = new Date();
+        await ticket.save();
+
+        if (this.fastify?.redis) {
+          await this.fastify.redis.del(`support_session:${ticket.customerPhone}`).catch(() => {});
+        }
+
+        try {
+          await this.whatsappService.sendMessage(
+            SUPPORT_AUTO_RESOLVED_MESSAGE(ticket.customerPhone, ticket.ticketId) as any
+          );
+        } catch (err: any) {
+          console.error('[SupportService] Failed to send auto-resolved message:', err?.message || err);
+        }
+
+        autoClosedCount++;
+        continue;
+      }
+
+      // Check if eligible for 10-min nudge
+      if (elapsedSinceLastMsg >= NUDGE_AFTER_MS && !ticket.inactivityWarningSentAt) {
+        ticket.inactivityWarningSentAt = new Date();
+        ticket.messages.push({
+          sender: 'system',
+          senderName: 'System',
+          text: 'Inactivity check-in nudge sent to customer via WhatsApp.',
+          timestamp: new Date(),
+        });
+        await ticket.save();
+
+        try {
+          await this.whatsappService.sendMessage(
+            SUPPORT_INACTIVITY_NUDGE_MESSAGE(ticket.customerPhone, ticket.ticketId) as any
+          );
+        } catch (err: any) {
+          console.error('[SupportService] Failed to send inactivity nudge:', err?.message || err);
+        }
+
+        nudgedCount++;
+      }
+    }
+
+    return { nudgedCount, autoClosedCount };
+  }
 }
+
